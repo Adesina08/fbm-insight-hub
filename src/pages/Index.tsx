@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, BarChart3, Users, Target, Activity } from "lucide-react";
+import { Upload, BarChart3, Users, Target, Activity, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
 import UploadSection from "@/components/dashboard/UploadSection";
+import QuestionnaireReference from "@/components/dashboard/QuestionnaireReference";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -37,7 +38,7 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4 mx-auto">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5 mx-auto">
             <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="w-4 h-4" />
               Overview
@@ -49,6 +50,10 @@ const Index = () => {
             <TabsTrigger value="segments" className="gap-2">
               <Users className="w-4 h-4" />
               Segments
+            </TabsTrigger>
+            <TabsTrigger value="questionnaire" className="gap-2">
+              <FileText className="w-4 h-4" />
+              Questionnaire
             </TabsTrigger>
             <TabsTrigger value="upload" className="gap-2">
               <Upload className="w-4 h-4" />
@@ -66,6 +71,10 @@ const Index = () => {
 
           <TabsContent value="segments" className="space-y-6">
             <SegmentProfiles />
+          </TabsContent>
+
+          <TabsContent value="questionnaire" className="space-y-6">
+            <QuestionnaireReference />
           </TabsContent>
 
           <TabsContent value="upload" className="space-y-6">

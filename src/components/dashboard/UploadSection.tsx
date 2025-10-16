@@ -84,37 +84,43 @@ const UploadSection = () => {
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success mt-0.5" />
                     <div>
-                      <span className="font-medium">Demographics:</span> Age, Education, Location, Marital Status
+                      <span className="font-medium">Demographics (A1-A12):</span> State, LGA, Location, Gender, Age, Marital Status, Education, Religion, Employment, Occupation, Media Access
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success mt-0.5" />
                     <div>
-                      <span className="font-medium">Motivation (C1-C4):</span> Desire, Benefit belief, Enjoyment, Social acceptance
+                      <span className="font-medium">Knowledge (B1-B3):</span> Heard about contraception, Currently using, Method type
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success mt-0.5" />
                     <div>
-                      <span className="font-medium">Ability (D1-D6):</span> Time, Cost, Physical effort, Mental effort, Routine, Skill
+                      <span className="font-medium">Motivation (C1-C4):</span> Personal desire (1-5), Benefit belief (1-5), Enjoyment (1-5), Social acceptance (1-5)
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success mt-0.5" />
                     <div>
-                      <span className="font-medium">Prompts (E1-E2):</span> Source exposure, Likelihood to act
+                      <span className="font-medium">Ability (D1-D6):</span> Ease of finding (1-5), Affordability (1-5), Physical ease (1-5), Mental ease (1-5), Routine fit (1-5), Confidence (1-5)
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success mt-0.5" />
                     <div>
-                      <span className="font-medium">Norms (F1-F2):</span> Descriptive, Injunctive
+                      <span className="font-medium">Prompts (E1-E2):</span> Source of prompts (health worker, partner, media, leaders), Likelihood to act (1-5)
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-success mt-0.5" />
                     <div>
-                      <span className="font-medium">System (G1-G3):</span> Service reliability, Provider respect, Access ease
+                      <span className="font-medium">Norms (F1-F2):</span> Community commonality (1-5), Approval perception (1-4)
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-success mt-0.5" />
+                    <div>
+                      <span className="font-medium">System (G1-G3):</span> Facility reliability (1-5), Provider respect (1-5), Access ease (1-5)
                     </div>
                   </div>
                 </div>
@@ -140,19 +146,23 @@ const UploadSection = () => {
                     </li>
                     <li className="flex gap-2">
                       <span>2.</span>
-                      <span>Computes composite scores (Motivation, Ability, Norms, System)</span>
+                      <span>Creates binary outcome (B2: 1=Yes, 2=No → 1/0)</span>
                     </li>
                     <li className="flex gap-2">
                       <span>3.</span>
-                      <span>Assigns respondents to FBM quadrants</span>
+                      <span>Computes Motivation (mean C1-C4), Ability (mean D1-D6), Norms (F1, F2 recoded), System (mean G1-G3)</span>
                     </li>
                     <li className="flex gap-2">
                       <span>4.</span>
-                      <span>Performs cluster analysis for segmentation</span>
+                      <span>Assigns FBM quadrants (High/Low M × A)</span>
                     </li>
                     <li className="flex gap-2">
                       <span>5.</span>
-                      <span>Updates all charts and visualizations</span>
+                      <span>Runs cluster analysis & logistic regression</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span>6.</span>
+                      <span>Updates all visualizations in real-time</span>
                     </li>
                   </ul>
                 </div>
