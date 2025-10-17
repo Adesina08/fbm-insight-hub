@@ -141,22 +141,15 @@ interface RawSubmission extends Record<string, unknown> {
   start?: string;
 }
 
-interface RawAsset extends Record<string, unknown> {}
-
 export interface KoboAssetSummary {
-  uid: string;
-  name: string;
-  assetType: string;
-  ownerUsername: string | null;
-  status: string;
-  deploymentStatus: string;
-  hasDeployment: boolean;
-  submissionCount: number;
-  dateModified: string | null;
-  dateDeployed: string | null;
-  lastSubmissionTime: string | null;
-  url: string | null;
-  tagString: string | null;
+  spreadsheetId: string;
+  title: string;
+  spreadsheetUrl: string | null;
+  timeZone: string | null;
+  totalRows: number;
+  totalColumns: number;
+  headers: string[];
+  lastUpdated: string | null;
 }
 
 const quadrantDetails: Record<QuadrantId, {
@@ -735,55 +728,49 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
   return buildAnalytics(results);
 }
 
-function normalizeAsset(raw: RawAsset): KoboAssetSummary | null {
-  const rawUid = raw.uid;
-  let uid: string | null = null;
-  if (typeof rawUid === "string" && rawUid.trim().length > 0) {
-    uid = rawUid;
-  } else if (typeof rawUid === "number") {
-    uid = String(rawUid);
+function normalizeSheetMetadata(raw: unknown): KoboAssetSummary {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Sheet metadata response was empty.");
   }
-  if (!uid) return null;
 
-  const name = typeof raw.name === "string" && raw.name.trim().length > 0 ? raw.name : "Untitled asset";
-  const assetType = typeof raw.asset_type === "string" && raw.asset_type.length > 0 ? raw.asset_type : "unknown";
-  const ownerUsername = typeof raw.owner__username === "string" ? raw.owner__username : null;
-  const hasDeployment = Boolean(raw.has_deployment);
+  const data = raw as Record<string, unknown>;
+  const spreadsheetId =
+    typeof data.spreadsheetId === "string" && data.spreadsheetId.trim().length > 0
+      ? data.spreadsheetId.trim()
+      : null;
+  if (!spreadsheetId) {
+    throw new Error("Sheet metadata is missing a spreadsheetId field.");
+  }
 
-  const deploymentStatusRaw =
-    typeof raw.deployment_status === "string" && raw.deployment_status.trim().length > 0
-      ? raw.deployment_status
-      : undefined;
-  const statusRaw = typeof raw.status === "string" && raw.status.trim().length > 0 ? raw.status : undefined;
-  const deploymentStatus = deploymentStatusRaw ?? (hasDeployment ? "deployed" : "draft");
-  const status = statusRaw ?? deploymentStatus;
-
-  const submissionCount = parseNumber(raw.deployment__submission_count) ?? 0;
-  const dateModified = typeof raw.date_modified === "string" ? raw.date_modified : null;
-  const dateDeployed = typeof raw.date_deployed === "string" ? raw.date_deployed : null;
-  const lastSubmissionTime =
-    typeof raw.deployment__last_submission_time === "string" ? raw.deployment__last_submission_time : null;
-  const url = typeof raw.url === "string" ? raw.url : null;
-  const tagString = typeof raw.tag_string === "string" && raw.tag_string.trim().length > 0 ? raw.tag_string : null;
+  const title =
+    typeof data.title === "string" && data.title.trim().length > 0 ? data.title.trim() : "Untitled spreadsheet";
+  const spreadsheetUrl =
+    typeof data.spreadsheetUrl === "string" && data.spreadsheetUrl.trim().length > 0
+      ? data.spreadsheetUrl.trim()
+      : null;
+  const timeZone =
+    typeof data.timeZone === "string" && data.timeZone.trim().length > 0 ? data.timeZone.trim() : null;
+  const totalRows = parseNumber(data.totalRows) ?? 0;
+  const totalColumns = parseNumber(data.totalColumns) ?? 0;
+  const headers = Array.isArray(data.headers)
+    ? data.headers.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  const lastUpdated =
+    typeof data.lastUpdated === "string" && data.lastUpdated.trim().length > 0 ? data.lastUpdated.trim() : null;
 
   return {
-    uid,
-    name,
-    assetType,
-    ownerUsername,
-    status,
-    deploymentStatus,
-    hasDeployment,
-    submissionCount,
-    dateModified,
-    dateDeployed,
-    lastSubmissionTime,
-    url,
-    tagString,
+    spreadsheetId,
+    title,
+    spreadsheetUrl,
+    timeZone,
+    totalRows,
+    totalColumns,
+    headers,
+    lastUpdated,
   };
 }
 
-export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
+export async function fetchKoboAssets(): Promise<KoboAssetSummary> {
   const url = getKoboProxyUrl("assets");
 
   let response: Response;
@@ -797,7 +784,7 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
     const details =
       error instanceof Error && error.message ? error.message : "The network request failed.";
     throw new Error(
-      `Unable to reach the Kobo assets endpoint. Please verify the proxy configuration. (${details})`,
+      `Unable to reach the sheet metadata endpoint. Please verify the proxy configuration. (${details})`,
     );
   }
 
@@ -805,19 +792,11 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
   const rawBody = await response.text();
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Kobo assets (${response.status}): ${summarizeBody(rawBody)}`);
+    throw new Error(`Failed to fetch sheet metadata (${response.status}): ${summarizeBody(rawBody)}`);
   }
 
   const payload = parseJsonResponse(rawBody, contentType, "assets");
-  const results: RawAsset[] = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.results)
-      ? payload.results
-      : [];
-
-  return results
-    .map((item) => normalizeAsset(item))
-    .filter((asset): asset is KoboAssetSummary => asset !== null);
+  return normalizeSheetMetadata(payload);
 }
 
 function formatNullableMetric(value: number | null): string {

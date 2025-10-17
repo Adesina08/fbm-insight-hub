@@ -1,18 +1,103 @@
 import type { IncomingMessage, ServerResponse } from "http";
 
+import { handleOptionsRequest, sendError, setCorsHeaders } from "./_lib/kobo";
 import {
-  fetchFromKobo,
-  handleOptionsRequest,
-  relayKoboResponse,
-  sendError,
-} from "./_lib/kobo";
+  convertSheetValuesToRecords,
+  fetchSheetValues,
+  fetchSpreadsheetMetadata,
+  type SheetRecord,
+} from "./_lib/sheets";
 
-const DEFAULT_QUERY = new URLSearchParams({
-  format: "json",
-  metadata: "on",
-  ordering: "-date_modified",
-  collections_first: "true",
-});
+interface SheetInfoResponse {
+  spreadsheetId: string;
+  spreadsheetUrl: string | null;
+  title: string;
+  timeZone: string | null;
+  totalRows: number;
+  totalColumns: number;
+  headers: string[];
+  lastUpdated: string | null;
+}
+
+function getDataRange(): string {
+  const range = process.env.GOOGLE_SHEETS_DATA_RANGE;
+  if (!range || range.trim().length === 0) {
+    throw new Error("Missing required environment variable GOOGLE_SHEETS_DATA_RANGE.");
+  }
+  return range.trim();
+}
+
+function parseTimestamp(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const time = Date.parse(trimmed);
+  if (Number.isNaN(time)) {
+    return null;
+  }
+  return new Date(time).toISOString();
+}
+
+function findSubmissionTimestamp(record: SheetRecord): string | null {
+  const candidates = [
+    "_submission_time",
+    "submission_time",
+    "end",
+    "end_time",
+    "start",
+    "start_time",
+    "timestamp",
+    "last_updated",
+  ];
+
+  for (const key of candidates) {
+    const value = record[key];
+    const parsed = parseTimestamp(value);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function computeLastUpdated(records: SheetRecord[]): string | null {
+  let latest: string | null = null;
+  for (const record of records) {
+    const timestamp = findSubmissionTimestamp(record);
+    if (!timestamp) continue;
+    if (!latest || timestamp > latest) {
+      latest = timestamp;
+    }
+  }
+  return latest;
+}
+
+function extractHeaders(values: unknown[][]): string[] {
+  if (!Array.isArray(values) || values.length === 0) {
+    return [];
+  }
+
+  const headerRow = values[0];
+  if (!Array.isArray(headerRow)) {
+    return [];
+  }
+
+  return headerRow
+    .map((cell) => (typeof cell === "string" ? cell.trim() : ""))
+    .map((value, index) => (value.length > 0 ? value : `Column ${index + 1}`));
+}
+
+function sendJson(res: ServerResponse, payload: SheetInfoResponse): void {
+  setCorsHeaders(res);
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(payload));
+}
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (handleOptionsRequest(req, res)) {
@@ -24,14 +109,39 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  const query = DEFAULT_QUERY.toString();
-
+  let range: string;
   try {
-    const response = await fetchFromKobo(`/api/v2/assets/?${query}`);
-    await relayKoboResponse(res, response);
+    range = getDataRange();
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to contact Kobo. Please try again later.";
+      error instanceof Error ? error.message : "Missing Google Sheets configuration.";
+    sendError(res, 500, message);
+    return;
+  }
+
+  try {
+    const [metadata, values] = await Promise.all([
+      fetchSpreadsheetMetadata(),
+      fetchSheetValues(range),
+    ]);
+
+    const headers = extractHeaders(values);
+    const records = convertSheetValuesToRecords(values);
+    const lastUpdated = computeLastUpdated(records);
+
+    sendJson(res, {
+      spreadsheetId: metadata.spreadsheetId,
+      spreadsheetUrl: metadata.spreadsheetUrl,
+      title: metadata.title,
+      timeZone: metadata.timeZone,
+      totalRows: records.length,
+      totalColumns: headers.length,
+      headers,
+      lastUpdated,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load Google Sheet metadata. Please try again later.";
     sendError(res, 502, message);
   }
 }
