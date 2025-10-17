@@ -140,6 +140,24 @@ interface RawSubmission extends Record<string, unknown> {
   start?: string;
 }
 
+interface RawAsset extends Record<string, unknown> {}
+
+export interface KoboAssetSummary {
+  uid: string;
+  name: string;
+  assetType: string;
+  ownerUsername: string | null;
+  status: string;
+  deploymentStatus: string;
+  hasDeployment: boolean;
+  submissionCount: number;
+  dateModified: string | null;
+  dateDeployed: string | null;
+  lastSubmissionTime: string | null;
+  url: string | null;
+  tagString: string | null;
+}
+
 const quadrantDetails: Record<QuadrantId, {
   label: string;
   color: string;
@@ -216,6 +234,18 @@ function getFieldMap(): FieldMap {
   });
 
   return map as FieldMap;
+}
+
+function getKoboBaseUrl(): string {
+  return (import.meta.env.VITE_KOBO_BASE_URL ?? DEFAULT_KOBO_BASE_URL).replace(/\/$/, "");
+}
+
+function getKoboToken(): string {
+  const token = import.meta.env.VITE_KOBO_TOKEN;
+  if (!token) {
+    throw new Error("Missing Kobo configuration. Please set VITE_KOBO_TOKEN.");
+  }
+  return token;
 }
 
 function parseNumber(value: unknown): number | null {
@@ -630,7 +660,7 @@ export function buildAnalytics(raw: RawSubmission[]): DashboardAnalytics {
 export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
   const assetId = import.meta.env.VITE_KOBO_ASSET_ID;
   const token = import.meta.env.VITE_KOBO_TOKEN;
-  const baseUrl = (import.meta.env.VITE_KOBO_BASE_URL ?? DEFAULT_KOBO_BASE_URL).replace(/\/$/, "");
+  const baseUrl = getKoboBaseUrl();
 
   if (!assetId || !token) {
     throw new Error("Missing Kobo configuration. Please set VITE_KOBO_ASSET_ID and VITE_KOBO_TOKEN.");
@@ -666,6 +696,98 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
       : [];
 
   return buildAnalytics(results);
+}
+
+function normalizeAsset(raw: RawAsset): KoboAssetSummary | null {
+  const rawUid = raw.uid;
+  let uid: string | null = null;
+  if (typeof rawUid === "string" && rawUid.trim().length > 0) {
+    uid = rawUid;
+  } else if (typeof rawUid === "number") {
+    uid = String(rawUid);
+  }
+  if (!uid) return null;
+
+  const name = typeof raw.name === "string" && raw.name.trim().length > 0 ? raw.name : "Untitled asset";
+  const assetType = typeof raw.asset_type === "string" && raw.asset_type.length > 0 ? raw.asset_type : "unknown";
+  const ownerUsername = typeof raw.owner__username === "string" ? raw.owner__username : null;
+  const hasDeployment = Boolean(raw.has_deployment);
+
+  const deploymentStatusRaw =
+    typeof raw.deployment_status === "string" && raw.deployment_status.trim().length > 0
+      ? raw.deployment_status
+      : undefined;
+  const statusRaw = typeof raw.status === "string" && raw.status.trim().length > 0 ? raw.status : undefined;
+  const deploymentStatus = deploymentStatusRaw ?? (hasDeployment ? "deployed" : "draft");
+  const status = statusRaw ?? deploymentStatus;
+
+  const submissionCount = parseNumber(raw.deployment__submission_count) ?? 0;
+  const dateModified = typeof raw.date_modified === "string" ? raw.date_modified : null;
+  const dateDeployed = typeof raw.date_deployed === "string" ? raw.date_deployed : null;
+  const lastSubmissionTime =
+    typeof raw.deployment__last_submission_time === "string" ? raw.deployment__last_submission_time : null;
+  const url = typeof raw.url === "string" ? raw.url : null;
+  const tagString = typeof raw.tag_string === "string" && raw.tag_string.trim().length > 0 ? raw.tag_string : null;
+
+  return {
+    uid,
+    name,
+    assetType,
+    ownerUsername,
+    status,
+    deploymentStatus,
+    hasDeployment,
+    submissionCount,
+    dateModified,
+    dateDeployed,
+    lastSubmissionTime,
+    url,
+    tagString,
+  };
+}
+
+export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
+  const baseUrl = getKoboBaseUrl();
+  const token = getKoboToken();
+
+  const searchParams = new URLSearchParams({
+    format: "json",
+    metadata: "on",
+    ordering: "-date_modified",
+    collections_first: "true",
+  });
+
+  const url = `${baseUrl}/api/v2/assets/?${searchParams.toString()}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        Authorization: `Token ${token}`,
+        Accept: "application/json",
+      },
+    });
+  } catch (error) {
+    const details =
+      error instanceof Error && error.message ? error.message : "The network request failed.";
+    throw new Error(`Unable to reach Kobo at ${baseUrl}. Please verify the Kobo configuration. (${details})`);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch Kobo assets (${response.status}): ${errorText}`);
+  }
+
+  const payload = await response.json();
+  const results: RawAsset[] = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.results)
+      ? payload.results
+      : [];
+
+  return results
+    .map((item) => normalizeAsset(item))
+    .filter((asset): asset is KoboAssetSummary => asset !== null);
 }
 
 function formatNullableMetric(value: number | null): string {
