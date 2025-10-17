@@ -637,12 +637,21 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
   }
 
   const url = `${baseUrl}/api/v2/assets/${assetId}/data/?format=json`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Token ${token}`,
-      Accept: "application/json",
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        Authorization: `Token ${token}`,
+        Accept: "application/json",
+      },
+    });
+  } catch (error) {
+    const details =
+      error instanceof Error && error.message ? error.message : "The network request failed.";
+    throw new Error(
+      `Unable to reach Kobo at ${baseUrl}. Please check your internet connection and Kobo configuration. (${details})`,
+    );
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
