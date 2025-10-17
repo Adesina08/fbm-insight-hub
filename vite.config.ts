@@ -93,10 +93,44 @@ function createKoboDevProxyPlugin(): PluginOption {
       const assetId = process.env.KOBO_ASSET_ID;
       const token = process.env.KOBO_TOKEN;
 
+      const missingConfigHandler: import("connect").NextHandleFunction = (req, res, next) => {
+        if (!req.url) {
+          next();
+          return;
+        }
+
+        const method = req.method?.toUpperCase() ?? "GET";
+        if (method === "OPTIONS") {
+          res.statusCode = 204;
+          setCors(res);
+          res.end();
+          return;
+        }
+
+        if (method !== "GET") {
+          next();
+          return;
+        }
+
+        res.statusCode = 500;
+        setCors(res);
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            error:
+              "Kobo proxy is not configured. Set KOBO_ASSET_ID and KOBO_TOKEN before running the dev server.",
+          }),
+        );
+      };
+
       if (!assetId || !token) {
         console.warn(
           "[kobo-dev-proxy] KOBO_ASSET_ID or KOBO_TOKEN is not set. Kobo requests will be skipped in development.",
         );
+
+        server.middlewares.use("/api/kobo-data", missingConfigHandler);
+        server.middlewares.use("/api/kobo-assets", missingConfigHandler);
+        server.middlewares.use("/api/kobo", missingConfigHandler);
         return;
       }
 
