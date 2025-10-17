@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, BarChart3, Users, Target, Activity, FileText } from "lucide-react";
+import { Upload, BarChart3, Users, Target, Activity, FileText, Zap, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
 import UploadSection from "@/components/dashboard/UploadSection";
 import QuestionnaireReference from "@/components/dashboard/QuestionnaireReference";
+import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivenessHeatmap";
+import PathDiagram from "@/components/dashboard/PathDiagram";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -38,26 +40,34 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl grid-cols-5 mx-auto">
+          <TabsList className="grid w-full max-w-5xl grid-cols-7 mx-auto">
             <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="w-4 h-4" />
-              Overview
+              <span className="hidden sm:inline">Overview</span>
             </TabsTrigger>
             <TabsTrigger value="fbm" className="gap-2">
               <Target className="w-4 h-4" />
-              FBM Analysis
+              <span className="hidden sm:inline">FBM</span>
             </TabsTrigger>
             <TabsTrigger value="segments" className="gap-2">
               <Users className="w-4 h-4" />
-              Segments
+              <span className="hidden sm:inline">Segments</span>
+            </TabsTrigger>
+            <TabsTrigger value="prompts" className="gap-2">
+              <Zap className="w-4 h-4" />
+              <span className="hidden sm:inline">Prompts</span>
+            </TabsTrigger>
+            <TabsTrigger value="regression" className="gap-2">
+              <Network className="w-4 h-4" />
+              <span className="hidden sm:inline">Regression</span>
             </TabsTrigger>
             <TabsTrigger value="questionnaire" className="gap-2">
               <FileText className="w-4 h-4" />
-              Questionnaire
+              <span className="hidden sm:inline">Reference</span>
             </TabsTrigger>
             <TabsTrigger value="upload" className="gap-2">
               <Upload className="w-4 h-4" />
-              Upload
+              <span className="hidden sm:inline">Upload</span>
             </TabsTrigger>
           </TabsList>
 
@@ -71,6 +81,14 @@ const Index = () => {
 
           <TabsContent value="segments" className="space-y-6">
             <SegmentProfiles />
+          </TabsContent>
+
+          <TabsContent value="prompts" className="space-y-6">
+            <PromptEffectivenessHeatmap />
+          </TabsContent>
+
+          <TabsContent value="regression" className="space-y-6">
+            <PathDiagram />
           </TabsContent>
 
           <TabsContent value="questionnaire" className="space-y-6">
