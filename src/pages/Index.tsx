@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, BarChart3, Users, Target, Activity, FileText, Zap, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,30 +9,39 @@ import UploadSection from "@/components/dashboard/UploadSection";
 import QuestionnaireReference from "@/components/dashboard/QuestionnaireReference";
 import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivenessHeatmap";
 import PathDiagram from "@/components/dashboard/PathDiagram";
+import { useKoboData } from "@/hooks/useKoboData";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
+  const { data, isLoading, isError, error, refetch, isFetching } = useKoboData();
+  const syncStatus = useMemo(() => {
+    if (isLoading) return "Connecting to Kobo…";
+    if (isFetching) return "Syncing latest submissions…";
+    if (isError) return error?.message ?? "Sync error";
+    return "Live data from Kobo";
+  }, [error?.message, isError, isFetching, isLoading]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       {/* Header */}
       <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-6 py-5 max-w-7xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-chart-3 to-secondary flex items-center justify-center shadow-lg">
-                <Activity className="w-7 h-7 text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-chart-3 to-secondary flex items-center justify-center shadow-lg">
+                  <Activity className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
+                    BEHAV360
+                  </h1>
+                  <p className="text-sm text-muted-foreground font-medium">Survey Analytics Dashboard</p>
+                  <p className="text-xs text-muted-foreground mt-1">{syncStatus}</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
-                  BEHAV360
-                </h1>
-                <p className="text-sm text-muted-foreground font-medium">Survey Analytics Dashboard</p>
-              </div>
-            </div>
-            <Button className="gap-2 bg-gradient-to-r from-primary to-chart-3 hover:opacity-90 shadow-md">
-              <Upload className="w-4 h-4" />
-              Upload Data
+              <Button className="gap-2 bg-gradient-to-r from-primary to-chart-3 hover:opacity-90 shadow-md">
+                <Upload className="w-4 h-4" />
+                Upload Data
             </Button>
           </div>
         </div>
@@ -74,23 +82,47 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 mt-8">
-            <DashboardOverview />
+            <DashboardOverview
+              stats={data?.stats}
+              quadrants={data?.quadrants}
+              lastUpdated={data?.lastUpdated}
+              isLoading={isLoading}
+              error={isError ? error?.message ?? "" : null}
+              onRetry={refetch}
+            />
           </TabsContent>
 
           <TabsContent value="fbm" className="space-y-6 mt-8">
-            <FBMQuadrantChart />
+            <FBMQuadrantChart
+              points={data?.scatter}
+              isLoading={isLoading}
+              error={isError ? error?.message ?? "" : null}
+            />
           </TabsContent>
 
           <TabsContent value="segments" className="space-y-6 mt-8">
-            <SegmentProfiles />
+            <SegmentProfiles
+              segments={data?.segments}
+              isLoading={isLoading}
+              error={isError ? error?.message ?? "" : null}
+            />
           </TabsContent>
 
           <TabsContent value="prompts" className="space-y-6 mt-8">
-            <PromptEffectivenessHeatmap />
+            <PromptEffectivenessHeatmap
+              rows={data?.promptEffectiveness}
+              isLoading={isLoading}
+              error={isError ? error?.message ?? "" : null}
+            />
           </TabsContent>
 
           <TabsContent value="regression" className="space-y-6 mt-8">
-            <PathDiagram />
+            <PathDiagram
+              regression={data?.regression}
+              summary={data?.modelSummary}
+              isLoading={isLoading}
+              error={isError ? error?.message ?? "" : null}
+            />
           </TabsContent>
 
           <TabsContent value="questionnaire" className="space-y-6 mt-8">
