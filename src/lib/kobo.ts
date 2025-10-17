@@ -1,4 +1,5 @@
-const DEFAULT_KOBO_PROXY_BASE = "/api/kobo";
+const DEFAULT_KOBO_PROXY_DATA_URL = "/api/kobo-data";
+const DEFAULT_KOBO_PROXY_ASSETS_URL = "/api/kobo-assets";
 
 const DEFAULT_FIELD_MAP = {
   motivation: "motivation_score",
@@ -237,10 +238,22 @@ function getFieldMap(): FieldMap {
 }
 
 function getKoboProxyUrl(path: "data" | "assets"): string {
-  const base = (import.meta.env.VITE_KOBO_PROXY_BASE_URL ?? DEFAULT_KOBO_PROXY_BASE).trim();
-  const normalizedBase = base.replace(/\/$/, "");
-  const normalizedPath = path === "data" ? "/data" : "/assets";
-  return `${normalizedBase}${normalizedPath}`;
+  const env = import.meta.env as Record<string, string | undefined> | undefined;
+
+  const specificOverride =
+    path === "data" ? env?.VITE_KOBO_PROXY_DATA_URL : env?.VITE_KOBO_PROXY_ASSETS_URL;
+  if (specificOverride && specificOverride.trim().length > 0) {
+    return specificOverride.trim();
+  }
+
+  const baseOverride = env?.VITE_KOBO_PROXY_BASE_URL;
+  if (baseOverride && baseOverride.trim().length > 0) {
+    const normalizedBase = baseOverride.trim().replace(/\/$/, "");
+    const normalizedPath = path === "data" ? "/data" : "/assets";
+    return `${normalizedBase}${normalizedPath}`;
+  }
+
+  return path === "data" ? DEFAULT_KOBO_PROXY_DATA_URL : DEFAULT_KOBO_PROXY_ASSETS_URL;
 }
 
 function parseNumber(value: unknown): number | null {
