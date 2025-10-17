@@ -57,12 +57,19 @@ const PathDiagram = () => {
   };
 
   return (
-    <Card>
+    <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle>Path Diagram: Predictors of Contraceptive Use</CardTitle>
-        <CardDescription>
-          Logistic regression results showing adjusted odds ratios and significance levels
-        </CardDescription>
+        <div className="flex items-start gap-3">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
+            <Info className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <CardTitle className="text-2xl">Path Diagram: Predictors of Contraceptive Use</CardTitle>
+            <CardDescription className="text-base mt-1">
+              Logistic regression results showing adjusted odds ratios and significance levels
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Path Diagram Visualization */}

@@ -17,43 +17,43 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 15%;
 
-    --primary: 200 95% 38%;
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 195 75% 55%;
+    --secondary: 262 83% 58%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 210 20% 94%;
     --muted-foreground: 215 15% 45%;
 
-    --accent: 175 60% 50%;
+    --accent: 221 83% 53%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 85% 60%;
+    --destructive: 346 77% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 215 20% 88%;
     --input: 215 20% 88%;
-    --ring: 200 95% 38%;
+    --ring: 221 83% 53%;
 
     --radius: 0.75rem;
 
-    --chart-1: 200 95% 38%;
-    --chart-2: 175 60% 50%;
-    --chart-3: 142 76% 45%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 346 77% 55%;
+    /* Enhanced Chart Colors - Professional Data Viz Palette */
+    --chart-1: 221 83% 53%;
+    --chart-2: 142 76% 36%;
+    --chart-3: 262 83% 58%;
+    --chart-4: 346 77% 50%;
+    --chart-5: 45 93% 47%;
 
-    --success: 142 76% 45%;
-    --warning: 38 92% 50%;
-    --info: 195 75% 55%;
+    /* Quadrant Colors */
+    --quadrant-high-m-high-a: 142 76% 36%;
+    --quadrant-high-m-low-a: 45 93% 47%;
+    --quadrant-low-m-high-a: 262 83% 58%;
+    --quadrant-low-m-low-a: 346 77% 50%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(200 95% 38%), hsl(195 75% 55%));
-    --gradient-accent: linear-gradient(135deg, hsl(175 60% 50%), hsl(142 76% 45%));
-    
-    --shadow-soft: 0 2px 8px -2px hsl(215 25% 15% / 0.08);
-    --shadow-medium: 0 4px 16px -4px hsl(215 25% 15% / 0.12);
-    --shadow-strong: 0 8px 24px -8px hsl(215 25% 15% / 0.16);
+    --success: 142 76% 36%;
+    --warning: 45 93% 47%;
+    --info: 221 83% 53%;
   }
 
   .dark {
@@ -66,38 +66,41 @@ All colors MUST be HSL.
     --popover: 215 28% 14%;
     --popover-foreground: 210 20% 95%;
 
-    --primary: 195 75% 55%;
+    --primary: 221 83% 63%;
     --primary-foreground: 215 30% 10%;
 
-    --secondary: 200 85% 45%;
+    --secondary: 262 83% 68%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 215 25% 20%;
     --muted-foreground: 215 15% 65%;
 
-    --accent: 175 60% 50%;
+    --accent: 221 83% 63%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 85% 60%;
+    --destructive: 346 77% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 215 25% 22%;
     --input: 215 25% 22%;
-    --ring: 195 75% 55%;
+    --ring: 221 83% 63%;
 
-    --chart-1: 195 75% 55%;
-    --chart-2: 175 60% 50%;
-    --chart-3: 142 76% 45%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 346 77% 55%;
+    /* Enhanced Chart Colors - Dark Mode */
+    --chart-1: 221 83% 63%;
+    --chart-2: 142 76% 46%;
+    --chart-3: 262 83% 68%;
+    --chart-4: 346 77% 60%;
+    --chart-5: 45 93% 57%;
 
-    --success: 142 76% 45%;
-    --warning: 38 92% 50%;
-    --info: 195 75% 55%;
+    /* Quadrant Colors - Dark Mode */
+    --quadrant-high-m-high-a: 142 76% 46%;
+    --quadrant-high-m-low-a: 45 93% 57%;
+    --quadrant-low-m-high-a: 262 83% 68%;
+    --quadrant-low-m-low-a: 346 77% 60%;
 
-    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
-    --shadow-strong: 0 8px 24px -8px hsl(0 0% 0% / 0.5);
+    --success: 142 76% 46%;
+    --warning: 45 93% 57%;
+    --info: 221 83% 63%;
   }
 }
 
@@ -108,5 +111,22 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

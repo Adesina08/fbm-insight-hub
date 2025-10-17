@@ -54,6 +54,12 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        quadrant: {
+          "high-m-high-a": "hsl(var(--quadrant-high-m-high-a))",
+          "high-m-low-a": "hsl(var(--quadrant-high-m-low-a))",
+          "low-m-high-a": "hsl(var(--quadrant-low-m-high-a))",
+          "low-m-low-a": "hsl(var(--quadrant-low-m-low-a))",
+        },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
         info: "hsl(var(--info))",

@@ -22,12 +22,19 @@ const PromptEffectivenessHeatmap = () => {
   };
 
   return (
-    <Card>
+    <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle>Prompt Effectiveness by Segment</CardTitle>
-        <CardDescription>
-          How different prompt types (Facilitator, Spark, Signal) perform across behavioral segments
-        </CardDescription>
+        <div className="flex items-start gap-3">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
+            <Info className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <CardTitle className="text-2xl">Prompt Effectiveness by Segment</CardTitle>
+            <CardDescription className="text-base mt-1">
+              How different prompt types (Facilitator, Spark, Signal) perform across behavioral segments
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Heatmap */}

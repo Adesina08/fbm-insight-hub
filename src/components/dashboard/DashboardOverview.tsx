@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUp, ArrowDown, Users, TrendingUp, Activity, Target } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Users, TrendingUp, Activity, Target } from "lucide-react";
 
 const DashboardOverview = () => {
   const stats = [
@@ -9,7 +9,7 @@ const DashboardOverview = () => {
       change: "+12.3%",
       trend: "up",
       icon: Users,
-      color: "text-chart-1"
+      gradient: "from-chart-1 to-chart-1/70"
     },
     {
       title: "Contraceptive Users",
@@ -17,23 +17,23 @@ const DashboardOverview = () => {
       change: "+8.7%",
       trend: "up",
       icon: Target,
-      color: "text-success"
+      gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/70"
     },
     {
       title: "Avg Motivation Score",
-      value: "3.8",
+      value: "3.8/5.0",
       change: "+0.3",
       trend: "up",
       icon: TrendingUp,
-      color: "text-chart-2"
+      gradient: "from-chart-3 to-chart-3/70"
     },
     {
       title: "Avg Ability Score",
-      value: "3.2",
+      value: "3.2/5.0",
       change: "-0.1",
       trend: "down",
       icon: Activity,
-      color: "text-warning"
+      gradient: "from-warning to-warning/70"
     }
   ];
 
@@ -43,57 +43,65 @@ const DashboardOverview = () => {
       percentage: "42%",
       count: 524,
       description: "Ready to act when prompted - focus on simple reminders and reinforcement",
-      color: "bg-success/10 border-success/30"
+      color: "border-quadrant-high-m-high-a bg-quadrant-high-m-high-a/5",
+      barColor: "bg-quadrant-high-m-high-a"
     },
     {
       quadrant: "High Motivation / Low Ability",
       percentage: "28%",
       count: 349,
       description: "Want to use contraception but face barriers - reduce logistical and financial obstacles",
-      color: "bg-chart-2/10 border-chart-2/30"
+      color: "border-quadrant-high-m-low-a bg-quadrant-high-m-low-a/5",
+      barColor: "bg-quadrant-high-m-low-a"
     },
     {
       quadrant: "Low Motivation / High Ability",
       percentage: "18%",
       count: 224,
       description: "Services accessible but lack motivation - deploy norm-based campaigns",
-      color: "bg-warning/10 border-warning/30"
+      color: "border-quadrant-low-m-high-a bg-quadrant-low-m-high-a/5",
+      barColor: "bg-quadrant-low-m-high-a"
     },
     {
       quadrant: "Low Motivation / Low Ability",
       percentage: "12%",
       count: 150,
       description: "Need integrated approach with strong prompts and barrier removal",
-      color: "bg-destructive/10 border-destructive/30"
+      color: "border-quadrant-low-m-low-a bg-quadrant-low-m-low-a/5",
+      barColor: "bg-quadrant-low-m-low-a"
     }
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
       {/* Key Metrics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="transition-all hover:shadow-md">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Card key={stat.title} className="group relative overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-card/50 backdrop-blur-sm">
+              <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-5 group-hover:opacity-10 transition-opacity`} />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <Icon className={`h-4 w-4 ${stat.color}`} />
+                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
+                  <Icon className="h-5 w-5 text-white" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stat.value}</div>
-                <p className={`text-xs flex items-center gap-1 mt-1 ${
-                  stat.trend === "up" ? "text-success" : "text-destructive"
-                }`}>
+                <div className="text-3xl font-bold mb-2">{stat.value}</div>
+                <div className="flex items-center gap-1.5 text-sm">
                   {stat.trend === "up" ? (
-                    <ArrowUp className="h-3 w-3" />
+                    <ArrowUpRight className="h-4 w-4 text-quadrant-high-m-high-a" />
                   ) : (
-                    <ArrowDown className="h-3 w-3" />
+                    <ArrowDownRight className="h-4 w-4 text-destructive" />
                   )}
-                  {stat.change} from last month
-                </p>
+                  <span className={stat.trend === "up" ? "text-quadrant-high-m-high-a font-semibold" : "text-destructive font-semibold"}>
+                    {stat.change}
+                  </span>
+                  <span className="text-muted-foreground">from last survey</span>
+                </div>
               </CardContent>
             </Card>
           );
@@ -101,35 +109,44 @@ const DashboardOverview = () => {
       </div>
 
       {/* FBM Quadrant Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle>FBM Quadrant Distribution</CardTitle>
-          <CardDescription>
-            Respondent distribution across Fogg Behavior Model quadrants
-          </CardDescription>
+      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
+        <CardHeader className="pb-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
+              <Target className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl">FBM Quadrant Distribution</CardTitle>
+              <CardDescription className="text-base mt-1">
+                Respondent distribution across Fogg Behavior Model quadrants
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {insights.map((insight) => (
               <div
                 key={insight.quadrant}
-                className={`p-4 rounded-lg border-2 transition-all hover:shadow-sm ${insight.color}`}
+                className={`group p-5 rounded-xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] duration-300 ${insight.color}`}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h4 className="font-semibold text-foreground">{insight.quadrant}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-lg text-foreground mb-2">{insight.quadrant}</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       {insight.description}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-foreground">{insight.percentage}</div>
-                    <div className="text-xs text-muted-foreground">{insight.count} respondents</div>
+                  <div className="text-right ml-6">
+                    <div className="text-4xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+                      {insight.percentage}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1 font-medium">{insight.count} users</div>
                   </div>
                 </div>
-                <div className="w-full bg-muted/50 rounded-full h-2 mt-3">
+                <div className="w-full bg-muted/50 rounded-full h-3 mt-4 overflow-hidden shadow-inner">
                   <div
-                    className="h-2 rounded-full bg-primary transition-all"
+                    className={`h-3 rounded-full ${insight.barColor} transition-all duration-500 shadow-sm`}
                     style={{ width: insight.percentage }}
                   />
                 </div>
@@ -140,51 +157,69 @@ const DashboardOverview = () => {
       </Card>
 
       {/* Key Findings */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Social Norms Impact</CardTitle>
-            <CardDescription>Influence of norms on behavior</CardDescription>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm hover:shadow-2xl transition-all">
+          <CardHeader className="pb-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-chart-2 to-chart-2/70 shadow-md">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Social Norms Impact</CardTitle>
+                <CardDescription>Influence of norms on behavior</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Descriptive Norms</span>
-                <span className="font-semibold text-chart-2">Strong Predictor (β=+1.8)</span>
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Descriptive Norms</span>
+                <span className="font-bold text-chart-2 text-base">Strong Predictor (β=+1.8)</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Injunctive Norms</span>
-                <span className="font-semibold text-chart-2">Moderate Effect</span>
+              <div className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Injunctive Norms</span>
+                <span className="font-bold text-chart-2 text-base">Moderate Effect</span>
               </div>
-              <p className="text-sm text-muted-foreground mt-4 pt-4 border-t">
-                Positive descriptive norms act as an amplifier, pushing individuals above the action threshold even at moderate ability levels.
-              </p>
+              <div className="mt-5 pt-5 border-t">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Positive descriptive norms act as an amplifier, pushing individuals above the action threshold even at moderate ability levels.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>System Readiness</CardTitle>
-            <CardDescription>Health system enablers impact</CardDescription>
+        <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm hover:shadow-2xl transition-all">
+          <CardHeader className="pb-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-warning to-warning/70 shadow-md">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">System Readiness</CardTitle>
+                <CardDescription>Health system enablers impact</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Service Reliability</span>
-                <span className="font-semibold text-success">3.6/5.0</span>
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Service Reliability</span>
+                <span className="font-bold text-quadrant-high-m-high-a text-base">3.6/5.0</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Provider Respect</span>
-                <span className="font-semibold text-success">4.1/5.0</span>
+              <div className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Provider Respect</span>
+                <span className="font-bold text-quadrant-high-m-high-a text-base">4.1/5.0</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Access & Infrastructure</span>
-                <span className="font-semibold text-warning">2.8/5.0</span>
+              <div className="p-3 rounded-lg bg-muted/50 flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">Access & Infrastructure</span>
+                <span className="font-bold text-warning text-base">2.8/5.0</span>
               </div>
-              <p className="text-sm text-muted-foreground mt-4 pt-4 border-t">
-                System score (β=+1.5) is a strong predictor - reliable services amplify motivation and norms effects.
-              </p>
+              <div className="mt-5 pt-5 border-t">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  System score (β=+1.5) is a strong predictor - reliable services amplify motivation and norms effects.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

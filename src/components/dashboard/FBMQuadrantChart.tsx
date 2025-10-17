@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Plot from 'react-plotly.js';
+import { Target, Info } from "lucide-react";
 
 // Sample data representing respondents in FBM quadrants
 const generateSampleData = () => {
@@ -66,119 +68,190 @@ const FBMQuadrantChart = () => {
   const [overlayType, setOverlayType] = useState<"norms" | "system">("norms");
   const data = generateSampleData();
 
+  const users = data.filter(d => d.currentUse);
+  const nonUsers = data.filter(d => !d.currentUse);
+
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="space-y-6 animate-fade-in">
+      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>FBM Quadrant Analysis</CardTitle>
-              <CardDescription>
-                Motivation vs Ability scatter plot with behavior outcomes
-              </CardDescription>
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">FBM Quadrant Analysis</CardTitle>
+                <CardDescription className="text-base mt-1">
+                  Motivation vs Ability scatter plot with behavior outcomes
+                </CardDescription>
+              </div>
             </div>
             <Select value={overlayType} onValueChange={(val) => setOverlayType(val as "norms" | "system")}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[200px] bg-background/50">
                 <SelectValue placeholder="Overlay" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="norms">Social Norms</SelectItem>
-                <SelectItem value="system">System Readiness</SelectItem>
+                <SelectItem value="norms">Social Norms Overlay</SelectItem>
+                <SelectItem value="system">System Readiness Overlay</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="relative w-full aspect-square max-w-3xl mx-auto">
-            {/* SVG Chart */}
-            <svg viewBox="0 0 600 600" className="w-full h-full">
-              {/* Background quadrants */}
-              <rect x="0" y="0" width="300" height="300" fill="hsl(var(--destructive) / 0.05)" />
-              <rect x="300" y="0" width="300" height="300" fill="hsl(var(--warning) / 0.05)" />
-              <rect x="0" y="300" width="300" height="300" fill="hsl(var(--warning) / 0.05)" />
-              <rect x="300" y="300" width="300" height="300" fill="hsl(var(--success) / 0.05)" />
-              
-              {/* Grid lines */}
-              <line x1="0" y1="300" x2="600" y2="300" stroke="hsl(var(--border))" strokeWidth="2" />
-              <line x1="300" y1="0" x2="300" y2="600" stroke="hsl(var(--border))" strokeWidth="2" />
-              
-              {/* Axis lines */}
-              <line x1="50" y1="550" x2="550" y2="550" stroke="hsl(var(--foreground))" strokeWidth="2" />
-              <line x1="50" y1="50" x2="50" y2="550" stroke="hsl(var(--foreground))" strokeWidth="2" />
-              
-              {/* Axis labels */}
-              <text x="300" y="585" textAnchor="middle" fill="hsl(var(--foreground))" fontSize="14" fontWeight="600">
-                Ability Score
-              </text>
-              <text x="15" y="300" textAnchor="middle" fill="hsl(var(--foreground))" fontSize="14" fontWeight="600" transform="rotate(-90 15 300)">
-                Motivation Score
-              </text>
-              
-              {/* Quadrant labels */}
-              <text x="150" y="150" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="12" fontWeight="500">
-                Low M / Low A
-              </text>
-              <text x="450" y="150" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="12" fontWeight="500">
-                Low M / High A
-              </text>
-              <text x="150" y="450" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="12" fontWeight="500">
-                High M / Low A
-              </text>
-              <text x="450" y="450" textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="12" fontWeight="500">
-                High M / High A
-              </text>
-              
-              {/* Data points */}
-              {data.map((point) => {
-                const x = 50 + (point.ability / 5) * 500;
-                const y = 550 - (point.motivation / 5) * 500;
-                const size = overlayType === "norms" 
-                  ? 2 + (point.norms / 5) * 6
-                  : 2 + (point.system / 5) * 6;
-                
-                return (
-                  <circle
-                    key={point.id}
-                    cx={x}
-                    cy={y}
-                    r={size}
-                    fill={point.currentUse ? "hsl(var(--success))" : "hsl(var(--chart-2))"}
-                    opacity="0.6"
-                    className="transition-all hover:opacity-100"
-                  >
-                    <title>
-                      {`Motivation: ${point.motivation.toFixed(1)}, Ability: ${point.ability.toFixed(1)}\nCurrent Use: ${point.currentUse ? "Yes" : "No"}\n${overlayType === "norms" ? "Norms" : "System"}: ${(overlayType === "norms" ? point.norms : point.system).toFixed(1)}`}
-                    </title>
-                  </circle>
-                );
-              })}
-              
-              {/* Legend */}
-              <g transform="translate(430, 20)">
-                <circle cx="10" cy="10" r="5" fill="hsl(var(--success))" opacity="0.7" />
-                <text x="20" y="15" fill="hsl(var(--foreground))" fontSize="11">Current User</text>
-                <circle cx="10" cy="30" r="5" fill="hsl(var(--chart-2))" opacity="0.7" />
-                <text x="20" y="35" fill="hsl(var(--foreground))" fontSize="11">Non-User</text>
-                <text x="10" y="55" fill="hsl(var(--muted-foreground))" fontSize="10">
-                  Size = {overlayType === "norms" ? "Norms" : "System"}
-                </text>
-              </g>
-            </svg>
+          <div className="w-full">
+            <Plot
+              data={[
+                {
+                  x: users.map(d => d.ability),
+                  y: users.map(d => d.motivation),
+                  mode: 'markers',
+                  type: 'scatter',
+                  name: 'Current Users',
+                  marker: {
+                    size: overlayType === "norms" 
+                      ? users.map(d => 6 + d.norms * 3)
+                      : users.map(d => 6 + d.system * 3),
+                    color: '#22c55e',
+                    opacity: 0.7,
+                    line: { color: '#16a34a', width: 1 }
+                  },
+                  hovertemplate: '<b>Current User</b><br>' +
+                    'Ability: %{x:.1f}<br>' +
+                    'Motivation: %{y:.1f}<br>' +
+                    (overlayType === 'norms' ? 'Norms: %{marker.size}' : 'System: %{marker.size}') +
+                    '<extra></extra>'
+                },
+                {
+                  x: nonUsers.map(d => d.ability),
+                  y: nonUsers.map(d => d.motivation),
+                  mode: 'markers',
+                  type: 'scatter',
+                  name: 'Non-Users',
+                  marker: {
+                    size: overlayType === "norms" 
+                      ? nonUsers.map(d => 6 + d.norms * 3)
+                      : nonUsers.map(d => 6 + d.system * 3),
+                    color: '#a855f7',
+                    opacity: 0.6,
+                    line: { color: '#9333ea', width: 1 }
+                  },
+                  hovertemplate: '<b>Non-User</b><br>' +
+                    'Ability: %{x:.1f}<br>' +
+                    'Motivation: %{y:.1f}<br>' +
+                    (overlayType === 'norms' ? 'Norms: %{marker.size}' : 'System: %{marker.size}') +
+                    '<extra></extra>'
+                }
+              ]}
+              layout={{
+                width: undefined,
+                height: 600,
+                autosize: true,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                xaxis: {
+                  title: { text: 'Ability Score', font: { size: 16, family: 'inherit' } },
+                  range: [0, 5.5],
+                  gridcolor: '#e5e7eb',
+                  zeroline: true,
+                  zerolinecolor: '#9ca3af'
+                },
+                yaxis: {
+                  title: { text: 'Motivation Score', font: { size: 16, family: 'inherit' } },
+                  range: [0, 5.5],
+                  gridcolor: '#e5e7eb',
+                  zeroline: true,
+                  zerolinecolor: '#9ca3af'
+                },
+                shapes: [
+                  // Vertical line at x=3
+                  {
+                    type: 'line',
+                    x0: 3, x1: 3,
+                    y0: 0, y1: 5.5,
+                    line: { color: '#6b7280', width: 2, dash: 'dash' }
+                  },
+                  // Horizontal line at y=3
+                  {
+                    type: 'line',
+                    x0: 0, x1: 5.5,
+                    y0: 3, y1: 3,
+                    line: { color: '#6b7280', width: 2, dash: 'dash' }
+                  },
+                  // Quadrant backgrounds
+                  {
+                    type: 'rect',
+                    x0: 0, x1: 3, y0: 0, y1: 3,
+                    fillcolor: '#ef4444',
+                    opacity: 0.05,
+                    layer: 'below',
+                    line: { width: 0 }
+                  },
+                  {
+                    type: 'rect',
+                    x0: 3, x1: 5.5, y0: 0, y1: 3,
+                    fillcolor: '#a855f7',
+                    opacity: 0.05,
+                    layer: 'below',
+                    line: { width: 0 }
+                  },
+                  {
+                    type: 'rect',
+                    x0: 0, x1: 3, y0: 3, y1: 5.5,
+                    fillcolor: '#f59e0b',
+                    opacity: 0.05,
+                    layer: 'below',
+                    line: { width: 0 }
+                  },
+                  {
+                    type: 'rect',
+                    x0: 3, x1: 5.5, y0: 3, y1: 5.5,
+                    fillcolor: '#22c55e',
+                    opacity: 0.05,
+                    layer: 'below',
+                    line: { width: 0 }
+                  }
+                ],
+                annotations: [
+                  { x: 1.5, y: 1.5, text: 'Low M / Low A', showarrow: false, font: { size: 11, color: '#9ca3af' } },
+                  { x: 4.25, y: 1.5, text: 'Low M / High A', showarrow: false, font: { size: 11, color: '#9ca3af' } },
+                  { x: 1.5, y: 4.25, text: 'High M / Low A', showarrow: false, font: { size: 11, color: '#9ca3af' } },
+                  { x: 4.25, y: 4.25, text: 'High M / High A', showarrow: false, font: { size: 11, color: '#9ca3af' } }
+                ],
+                legend: {
+                  x: 1,
+                  xanchor: 'right',
+                  y: 1,
+                  bgcolor: 'rgba(255,255,255,0.9)',
+                  bordercolor: '#e5e7eb',
+                  borderwidth: 1
+                },
+                margin: { l: 60, r: 20, t: 20, b: 60 }
+              }}
+              config={{ responsive: true, displayModeBar: false }}
+              style={{ width: '100%' }}
+            />
           </div>
           
           {/* Insights */}
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="p-4 rounded-lg bg-success/10 border border-success/30">
-              <h4 className="font-semibold text-sm mb-2">Key Finding</h4>
-              <p className="text-sm text-muted-foreground">
+          <div className="mt-8 grid gap-6 md:grid-cols-2">
+            <div className="p-5 rounded-xl bg-gradient-to-br from-quadrant-high-m-high-a/10 to-quadrant-high-m-high-a/5 border-2 border-quadrant-high-m-high-a/30 shadow-lg">
+              <div className="flex items-start gap-3 mb-3">
+                <Info className="w-5 h-5 text-quadrant-high-m-high-a mt-0.5" />
+                <h4 className="font-bold text-base">Key Finding</h4>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 {overlayType === "norms" 
-                  ? "Strong positive social norms amplify behavior - individuals with higher norm scores are more likely to be above the action line even at moderate ability."
-                  : "System readiness acts as a critical gatekeeper - reliable services and supportive providers significantly increase contraceptive uptake across all motivation levels."}
+                  ? "Strong positive social norms amplify behavior - individuals with higher norm scores (larger bubbles) are more likely to be above the action line even at moderate ability."
+                  : "System readiness acts as a critical gatekeeper - reliable services and supportive providers (larger bubbles) significantly increase contraceptive uptake across all motivation levels."}
               </p>
             </div>
-            <div className="p-4 rounded-lg bg-chart-2/10 border border-chart-2/30">
-              <h4 className="font-semibold text-sm mb-2">Recommended Action</h4>
-              <p className="text-sm text-muted-foreground">
+            <div className="p-5 rounded-xl bg-gradient-to-br from-chart-3/10 to-chart-3/5 border-2 border-chart-3/30 shadow-lg">
+              <div className="flex items-start gap-3 mb-3">
+                <Target className="w-5 h-5 text-chart-3 mt-0.5" />
+                <h4 className="font-bold text-base">Recommended Action</h4>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 {overlayType === "norms"
                   ? "Deploy norm-based campaigns targeting the Low Motivation / High Ability quadrant, emphasizing peer adoption and community acceptance."
                   : "Strengthen health system infrastructure in the High Motivation / Low Ability quadrant by reducing costs, ensuring supply reliability, and improving provider respect."}
