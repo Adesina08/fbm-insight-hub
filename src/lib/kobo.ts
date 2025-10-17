@@ -665,6 +665,42 @@ export function buildAnalytics(raw: RawSubmission[]): DashboardAnalytics {
   };
 }
 
+function summarizeBody(body: string, limit = 120): string {
+  if (!body) return "<empty response>";
+  const normalized = body.replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, limit)}…`;
+}
+
+function parseJsonResponse(rawBody: string, contentType: string, context: string): unknown {
+  const isJson = contentType.toLowerCase().includes("json");
+
+  if (!isJson) {
+    const preview = summarizeBody(rawBody);
+    const hint = preview.startsWith("import ")
+      ? " The response looks like a Vite module. When running the dev server, ensure KOBO_ASSET_ID and KOBO_TOKEN are set so the Kobo proxy can return JSON."
+      : "";
+    const typeLabel = contentType || "unknown";
+    throw new Error(
+      `Unexpected response from the Kobo proxy while loading ${context}. Expected JSON but received content-type \"${typeLabel}\".${hint} Response preview: ${preview}`,
+    );
+  }
+
+  if (!rawBody) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch (error) {
+    const message = error instanceof Error && error.message ? error.message : "Unknown parser error.";
+    const preview = summarizeBody(rawBody);
+    throw new Error(
+      `Failed to parse Kobo ${context} response as JSON (${message}). Response preview: ${preview}`,
+    );
+  }
+}
+
 export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
   const url = getKoboProxyUrl("data");
   let response: Response;
@@ -682,12 +718,14 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
     );
   }
 
+  const contentType = response.headers.get("content-type") ?? "";
+  const rawBody = await response.text();
+
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to fetch Kobo data (${response.status}): ${errorText}`);
+    throw new Error(`Failed to fetch Kobo data (${response.status}): ${summarizeBody(rawBody)}`);
   }
 
-  const payload = await response.json();
+  const payload = parseJsonResponse(rawBody, contentType, "data");
   const results: RawSubmission[] = Array.isArray(payload)
     ? payload
     : Array.isArray(payload?.results)
@@ -763,12 +801,14 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
     );
   }
 
+  const contentType = response.headers.get("content-type") ?? "";
+  const rawBody = await response.text();
+
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to fetch Kobo assets (${response.status}): ${errorText}`);
+    throw new Error(`Failed to fetch Kobo assets (${response.status}): ${summarizeBody(rawBody)}`);
   }
 
-  const payload = await response.json();
+  const payload = parseJsonResponse(rawBody, contentType, "assets");
   const results: RawAsset[] = Array.isArray(payload)
     ? payload
     : Array.isArray(payload?.results)
