@@ -1,4 +1,4 @@
-const DEFAULT_KOBO_BASE_URL = "https://kf.kobotoolbox.org";
+const DEFAULT_KOBO_PROXY_BASE = "/api/kobo";
 
 const DEFAULT_FIELD_MAP = {
   motivation: "motivation_score",
@@ -236,16 +236,11 @@ function getFieldMap(): FieldMap {
   return map as FieldMap;
 }
 
-function getKoboBaseUrl(): string {
-  return (import.meta.env.VITE_KOBO_BASE_URL ?? DEFAULT_KOBO_BASE_URL).replace(/\/$/, "");
-}
-
-function getKoboToken(): string {
-  const token = import.meta.env.VITE_KOBO_TOKEN;
-  if (!token) {
-    throw new Error("Missing Kobo configuration. Please set VITE_KOBO_TOKEN.");
-  }
-  return token;
+function getKoboProxyUrl(path: "data" | "assets"): string {
+  const base = (import.meta.env.VITE_KOBO_PROXY_BASE_URL ?? DEFAULT_KOBO_PROXY_BASE).trim();
+  const normalizedBase = base.replace(/\/$/, "");
+  const normalizedPath = path === "data" ? "/data" : "/assets";
+  return `${normalizedBase}${normalizedPath}`;
 }
 
 function parseNumber(value: unknown): number | null {
@@ -658,20 +653,11 @@ export function buildAnalytics(raw: RawSubmission[]): DashboardAnalytics {
 }
 
 export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
-  const assetId = import.meta.env.VITE_KOBO_ASSET_ID;
-  const token = import.meta.env.VITE_KOBO_TOKEN;
-  const baseUrl = getKoboBaseUrl();
-
-  if (!assetId || !token) {
-    throw new Error("Missing Kobo configuration. Please set VITE_KOBO_ASSET_ID and VITE_KOBO_TOKEN.");
-  }
-
-  const url = `${baseUrl}/api/v2/assets/${assetId}/data/?format=json`;
+  const url = getKoboProxyUrl("data");
   let response: Response;
   try {
     response = await fetch(url, {
       headers: {
-        Authorization: `Token ${token}`,
         Accept: "application/json",
       },
     });
@@ -679,7 +665,7 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
     const details =
       error instanceof Error && error.message ? error.message : "The network request failed.";
     throw new Error(
-      `Unable to reach Kobo at ${baseUrl}. Please check your internet connection and Kobo configuration. (${details})`,
+      `Unable to reach the Kobo data endpoint. Please check your internet connection and proxy configuration. (${details})`,
     );
   }
 
@@ -747,30 +733,21 @@ function normalizeAsset(raw: RawAsset): KoboAssetSummary | null {
 }
 
 export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
-  const baseUrl = getKoboBaseUrl();
-  const token = getKoboToken();
-
-  const searchParams = new URLSearchParams({
-    format: "json",
-    metadata: "on",
-    ordering: "-date_modified",
-    collections_first: "true",
-  });
-
-  const url = `${baseUrl}/api/v2/assets/?${searchParams.toString()}`;
+  const url = getKoboProxyUrl("assets");
 
   let response: Response;
   try {
     response = await fetch(url, {
       headers: {
-        Authorization: `Token ${token}`,
         Accept: "application/json",
       },
     });
   } catch (error) {
     const details =
       error instanceof Error && error.message ? error.message : "The network request failed.";
-    throw new Error(`Unable to reach Kobo at ${baseUrl}. Please verify the Kobo configuration. (${details})`);
+    throw new Error(
+      `Unable to reach the Kobo assets endpoint. Please verify the proxy configuration. (${details})`,
+    );
   }
 
   if (!response.ok) {

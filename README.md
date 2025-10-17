@@ -64,12 +64,13 @@ This project is built with:
 
 The dashboard now reads live data directly from KoboCollect/KoboToolbox and refreshes automatically when new submissions arrive. To enable the integration:
 
-1. Copy `.env.example` to `.env` and populate the values:
-   - `VITE_KOBO_ASSET_ID` – the UID of your Kobo form (e.g. `a1b2cd34ef56gh7ijk890l`).
-   - `VITE_KOBO_TOKEN` – a Kobo API token with access to the form's submissions.
-   - (Optional) `VITE_KOBO_BASE_URL` if you use a regional Kobo deployment.
-   - (Optional) override the field mappings (`VITE_KOBO_FIELD_*`) if your survey question names differ from the defaults.
-2. Restart `npm run dev` so Vite picks up the environment variables.
+1. Copy `.env.example` to `.env` and populate the **server-side** values (do **not** prefix them with `VITE_`):
+   - `KOBO_ASSET_ID` – the UID of your Kobo form (e.g. `a1b2cd34ef56gh7ijk890l`).
+   - `KOBO_TOKEN` – a Kobo API token with access to the form's submissions.
+   - (Optional) `KOBO_BASE_URL` if you use the EU Kobo deployment or a self-hosted instance.
+   - (Optional) override the frontend field mappings (`VITE_KOBO_FIELD_*`) if your survey question names differ from the defaults.
+   - (Optional) set `VITE_KOBO_PROXY_BASE_URL` if your deployment exposes the API proxy on a non-default path.
+2. Restart `npm run dev` so Vite picks up the environment variables. During local development, the Vite dev server will proxy `/api/kobo/*` requests to Kobo using the values above. In production, deploy the bundled `api/kobo-*.ts` functions (e.g. on Vercel/Netlify) so the browser never talks to Kobo directly.
 
 The frontend polls Kobo every 60 seconds to keep charts and metrics up to date. If the connection fails, each widget shows contextual error messaging with a retry option.
 
