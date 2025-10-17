@@ -60,6 +60,19 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Connecting to KoboCollect
+
+The dashboard now reads live data directly from KoboCollect/KoboToolbox and refreshes automatically when new submissions arrive. To enable the integration:
+
+1. Copy `.env.example` to `.env` and populate the values:
+   - `VITE_KOBO_ASSET_ID` – the UID of your Kobo form (e.g. `a1b2cd34ef56gh7ijk890l`).
+   - `VITE_KOBO_TOKEN` – a Kobo API token with access to the form's submissions.
+   - (Optional) `VITE_KOBO_BASE_URL` if you use a regional Kobo deployment.
+   - (Optional) override the field mappings (`VITE_KOBO_FIELD_*`) if your survey question names differ from the defaults.
+2. Restart `npm run dev` so Vite picks up the environment variables.
+
+The frontend polls Kobo every 60 seconds to keep charts and metrics up to date. If the connection fails, each widget shows contextual error messaging with a retry option.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/f1fdd8b2-afa5-4b33-abf6-7f8164905e4a) and click on Share -> Publish.
