@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { LucideIcon } from "lucide-react";
-import { ArrowUpRight, ArrowDownRight, Users, TrendingUp, Activity, Target, RefreshCcw } from "lucide-react";
+import { Users, TrendingUp, Activity, Target, RefreshCcw } from "lucide-react";
 import type { DashboardAnalytics, QuadrantInsight } from "@/lib/googleSheets";
 
 interface DashboardOverviewProps {
@@ -18,15 +18,6 @@ interface DashboardOverviewProps {
 const formatNumber = (value: number | null | undefined, options: Intl.NumberFormatOptions = {}) => {
   if (value == null || Number.isNaN(value)) return "n/a";
   return new Intl.NumberFormat(undefined, options).format(value);
-};
-
-const formatChange = (value: number | null | undefined, suffix = "%") => {
-  if (value == null || Number.isNaN(value)) return { text: "n/a", trend: "flat" as const };
-  const rounded = value >= 10 || value <= -10 ? value.toFixed(0) : value.toFixed(1);
-  return {
-    text: `${value > 0 ? "+" : ""}${rounded}${suffix}`,
-    trend: value > 0 ? ("up" as const) : value < 0 ? ("down" as const) : ("flat" as const),
-  };
 };
 
 const formatAverage = (value: number | null | undefined) => {
@@ -105,7 +96,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
   const cards: Array<{
     title: string;
     value: string;
-    change: ReturnType<typeof formatChange>;
     trendIcon: LucideIcon;
     suffix: string;
     gradient: string;
@@ -113,7 +103,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
     {
       title: "Total Respondents",
       value: formatNumber(stats.totalRespondents.value),
-      change: formatChange(stats.totalRespondents.change),
       trendIcon: Users,
       suffix: "",
       gradient: "from-chart-1 to-chart-1/60",
@@ -121,7 +110,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
     {
       title: "Contraceptive Users",
       value: formatNumber(stats.currentUsers.value),
-      change: formatChange(stats.currentUsers.change, " pp"),
       trendIcon: Target,
       suffix: "",
       gradient: "from-chart-2 to-chart-2/60",
@@ -132,7 +120,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
         stats.averageMotivation.value == null || Number.isNaN(stats.averageMotivation.value)
           ? "n/a"
           : stats.averageMotivation.value.toFixed(2),
-      change: formatChange(stats.averageMotivation.change, ""),
       trendIcon: TrendingUp,
       suffix: " / 5",
       gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/60",
@@ -143,7 +130,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
         stats.averageAbility.value == null || Number.isNaN(stats.averageAbility.value)
           ? "n/a"
           : stats.averageAbility.value.toFixed(2),
-      change: formatChange(stats.averageAbility.change, ""),
       trendIcon: Activity,
       suffix: " / 5",
       gradient: "from-chart-4 to-chart-4/60",
@@ -172,7 +158,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.trendIcon;
-          const change = card.change;
           return (
             <Card key={card.title} className="group relative overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-card/50 backdrop-blur-sm">
               <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-5 group-hover:opacity-10 transition-opacity`} />
@@ -184,27 +169,12 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
                   <Icon className="h-5 w-5 text-white" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-baseline justify-between gap-4">
-                  <div className="text-3xl font-bold">
-                    {card.value}
-                    {card.suffix && card.value !== "n/a" ? (
-                      <span className="text-base font-medium text-muted-foreground">{card.suffix}</span>
-                    ) : null}
-                  </div>
-                  <div
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r ${
-                      change.trend === "up"
-                        ? "from-quadrant-high-m-high-a/20 to-quadrant-high-m-high-a/10 text-quadrant-high-m-high-a"
-                        : change.trend === "down"
-                          ? "from-destructive/20 to-destructive/10 text-destructive"
-                          : "from-muted/70 to-muted/40 text-muted-foreground"
-                    }`}
-                  >
-                    {change.trend === "up" && <ArrowUpRight className="h-4 w-4" />}
-                    {change.trend === "down" && <ArrowDownRight className="h-4 w-4" />}
-                    <span>{change.text}</span>
-                  </div>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {card.value}
+                  {card.suffix && card.value !== "n/a" ? (
+                    <span className="text-base font-medium text-muted-foreground">{card.suffix}</span>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
