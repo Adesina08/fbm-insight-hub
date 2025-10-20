@@ -63,6 +63,456 @@ function findMatchingKey(record: NormalizedRecord, tokens: readonly string[]): s
   return undefined;
 }
 
+function getValueForTokens(record: NormalizedRecord, tokens: readonly string[]): unknown {
+  const match = findMatchingKey(record, tokens);
+  return match ? record.get(match) : undefined;
+}
+
+const LIKERT_NULL_TERMS = [
+  "na",
+  "n a",
+  "n\/a",
+  "not applicable",
+  "dont know",
+  "don't know",
+  "do not know",
+  "unknown",
+  "unsure",
+  "not sure",
+  "refused",
+  "prefer not",
+];
+
+const STRONG_POSITIVE_PHRASES = [
+  "very much",
+  "extremely",
+  "completely",
+  "strongly agree",
+  "very easy",
+  "very likely",
+  "very common",
+  "very supportive",
+  "very respectful",
+  "very reliable",
+  "very confident",
+  "much easier",
+  "very well",
+  "definitely",
+  "always",
+];
+
+const MODERATE_POSITIVE_PHRASES = [
+  "mostly",
+  "quite a bit",
+  "agree",
+  "easy",
+  "likely",
+  "common",
+  "supportive",
+  "respectful",
+  "reliable",
+  "confident",
+  "somewhat easy",
+  "somewhat likely",
+  "somewhat confident",
+  "easier",
+  "fairly",
+  "usually",
+  "well",
+  "approve",
+];
+
+const NEUTRAL_PHRASES = [
+  "neither",
+  "neutral",
+  "somewhat",
+  "moderate",
+  "sometimes",
+  "about average",
+  "mixed",
+  "ok",
+  "average",
+  "balanced",
+];
+
+const MODERATE_NEGATIVE_PHRASES = [
+  "slightly",
+  "a little",
+  "disagree",
+  "difficult",
+  "unlikely",
+  "rarely",
+  "uncommon",
+  "unsupportive",
+  "disrespectful",
+  "unreliable",
+  "harder",
+  "less confident",
+  "poorly",
+];
+
+const STRONG_NEGATIVE_PHRASES = [
+  "not at all",
+  "strongly disagree",
+  "very difficult",
+  "very unlikely",
+  "never",
+  "very uncommon",
+  "very unsupportive",
+  "very disrespectful",
+  "very unreliable",
+  "much harder",
+  "not confident",
+  "not well",
+  "very poorly",
+];
+
+function normalizeTextValue(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function includesPhrase(normalized: string, phrase: string): boolean {
+  const trimmed = phrase.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (trimmed.includes(" ")) {
+    return normalized.includes(trimmed);
+  }
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`\\b${escaped}\\b`);
+  return regex.test(normalized);
+}
+
+function parseLikertScore(value: unknown): number | null {
+  const numeric = parseNumber(value);
+  if (numeric != null) {
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    if (numeric <= 0) {
+      return 1;
+    }
+    if (numeric >= 5) {
+      return 5;
+    }
+    return numeric;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = normalizeTextValue(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (LIKERT_NULL_TERMS.some((term) => normalized === term || normalized.includes(term))) {
+    return null;
+  }
+
+  if (
+    includesPhrase(normalized, "somewhat easy") ||
+    includesPhrase(normalized, "somewhat likely") ||
+    includesPhrase(normalized, "somewhat supportive") ||
+    includesPhrase(normalized, "somewhat confident") ||
+    includesPhrase(normalized, "somewhat well")
+  ) {
+    return 4;
+  }
+
+  if (
+    includesPhrase(normalized, "somewhat difficult") ||
+    includesPhrase(normalized, "somewhat unlikely") ||
+    includesPhrase(normalized, "somewhat hard") ||
+    includesPhrase(normalized, "somewhat unsupportive") ||
+    includesPhrase(normalized, "somewhat poorly")
+  ) {
+    return 2;
+  }
+
+  if (STRONG_POSITIVE_PHRASES.some((phrase) => includesPhrase(normalized, phrase))) {
+    return 5;
+  }
+
+  if (MODERATE_POSITIVE_PHRASES.some((phrase) => includesPhrase(normalized, phrase))) {
+    return 4;
+  }
+
+  if (NEUTRAL_PHRASES.some((phrase) => includesPhrase(normalized, phrase))) {
+    return 3;
+  }
+
+  if (STRONG_NEGATIVE_PHRASES.some((phrase) => includesPhrase(normalized, phrase))) {
+    return 1;
+  }
+
+  if (MODERATE_NEGATIVE_PHRASES.some((phrase) => includesPhrase(normalized, phrase))) {
+    return 2;
+  }
+
+  if (includesPhrase(normalized, "disagree")) {
+    return includesPhrase(normalized, "strongly disagree") ? 1 : 2;
+  }
+
+  if (includesPhrase(normalized, "agree") && !includesPhrase(normalized, "disagree")) {
+    return includesPhrase(normalized, "strongly") ? 5 : 4;
+  }
+
+  if (includesPhrase(normalized, "unlikely")) {
+    return includesPhrase(normalized, "very unlikely") ? 1 : 2;
+  }
+
+  if (includesPhrase(normalized, "likely")) {
+    return includesPhrase(normalized, "very likely") ? 5 : 4;
+  }
+
+  if (includesPhrase(normalized, "very easy")) {
+    return 5;
+  }
+
+  if (includesPhrase(normalized, "easy") && !includesPhrase(normalized, "uneasy") && !includesPhrase(normalized, "difficult")) {
+    return 4;
+  }
+
+  if (includesPhrase(normalized, "very difficult") || includesPhrase(normalized, "very hard")) {
+    return 1;
+  }
+
+  if (includesPhrase(normalized, "difficult") || includesPhrase(normalized, "hard")) {
+    return 2;
+  }
+
+  if (includesPhrase(normalized, "very common")) {
+    return 5;
+  }
+
+  if (includesPhrase(normalized, "common") && !includesPhrase(normalized, "uncommon")) {
+    return 4;
+  }
+
+  if (includesPhrase(normalized, "very uncommon") || includesPhrase(normalized, "very rare")) {
+    return 1;
+  }
+
+  if (includesPhrase(normalized, "uncommon") || includesPhrase(normalized, "rare")) {
+    return 2;
+  }
+
+  if (includesPhrase(normalized, "very supportive") || includesPhrase(normalized, "very respectful")) {
+    return 5;
+  }
+
+  if (includesPhrase(normalized, "supportive") || includesPhrase(normalized, "respectful")) {
+    return includesPhrase(normalized, "unsupportive") || includesPhrase(normalized, "disrespectful") ? 2 : 4;
+  }
+
+  if (includesPhrase(normalized, "unsupportive") || includesPhrase(normalized, "disrespectful")) {
+    return includesPhrase(normalized, "very") ? 1 : 2;
+  }
+
+  if (includesPhrase(normalized, "very reliable")) {
+    return 5;
+  }
+
+  if (includesPhrase(normalized, "reliable") && !includesPhrase(normalized, "unreliable")) {
+    return 4;
+  }
+
+  if (includesPhrase(normalized, "unreliable")) {
+    return includesPhrase(normalized, "very") ? 1 : 2;
+  }
+
+  if (includesPhrase(normalized, "very confident")) {
+    return 5;
+  }
+
+  if (includesPhrase(normalized, "confident")) {
+    if (includesPhrase(normalized, "not")) {
+      return includesPhrase(normalized, "not at all") ? 1 : 2;
+    }
+    if (includesPhrase(normalized, "somewhat")) {
+      return 3;
+    }
+    return 4;
+  }
+
+  if (includesPhrase(normalized, "very well")) {
+    return 5;
+  }
+
+  if (includesPhrase(normalized, "well")) {
+    return 4;
+  }
+
+  if (includesPhrase(normalized, "poorly")) {
+    return includesPhrase(normalized, "very") ? 1 : 2;
+  }
+
+  if (includesPhrase(normalized, "much easier")) {
+    return 5;
+  }
+
+  if (includesPhrase(normalized, "easier")) {
+    return 4;
+  }
+
+  if (includesPhrase(normalized, "much harder")) {
+    return 1;
+  }
+
+  if (includesPhrase(normalized, "harder")) {
+    return 2;
+  }
+
+  return null;
+}
+
+function averageNumbers(values: Array<number | null | undefined>): number | null {
+  const filtered = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (filtered.length === 0) {
+    return null;
+  }
+  const sum = filtered.reduce((acc, value) => acc + value, 0);
+  return sum / filtered.length;
+}
+
+interface DerivedMetrics {
+  motivation?: number | null;
+  ability?: number | null;
+  descriptiveNorms?: number | null;
+  injunctiveNorms?: number | null;
+  systemReadiness?: number | null;
+  promptFacilitator?: number | null;
+  promptSpark?: number | null;
+  promptSignal?: number | null;
+  currentUse?: boolean | null;
+}
+
+function computePromptExposure(
+  record: NormalizedRecord,
+  groups: string[][],
+  options?: { noPromptTokens?: string[] },
+): number | null {
+  if (options?.noPromptTokens) {
+    const noPrompt = parseBoolean(getValueForTokens(record, options.noPromptTokens));
+    if (noPrompt === true) {
+      return 1;
+    }
+  }
+
+  const exposures = groups.map((tokens) => {
+    const raw = getValueForTokens(record, tokens);
+    const parsed = parseBoolean(raw);
+    if (parsed != null) {
+      return parsed ? 1 : 0;
+    }
+    if (typeof raw === "string") {
+      const normalized = normalizeTextValue(raw);
+      if (!normalized) {
+        return null;
+      }
+      if (normalized.includes("yes")) {
+        return 1;
+      }
+      if (normalized.includes("no")) {
+        return 0;
+      }
+    }
+    if (typeof raw === "number") {
+      if (!Number.isFinite(raw)) {
+        return null;
+      }
+      return raw > 0 ? 1 : 0;
+    }
+    return null;
+  });
+
+  const valid = exposures.filter((value): value is number => value != null);
+  if (valid.length === 0) {
+    return null;
+  }
+
+  const ratio = valid.reduce((acc, value) => acc + value, 0) / valid.length;
+  return ratio * 4 + 1;
+}
+
+function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
+  const motivation = averageNumbers([
+    parseLikertScore(getValueForTokens(record, ["c1"])),
+    parseLikertScore(getValueForTokens(record, ["c2"])),
+    parseLikertScore(getValueForTokens(record, ["c3"])),
+    parseLikertScore(getValueForTokens(record, ["c4"])),
+  ]);
+
+  const ability = averageNumbers([
+    parseLikertScore(getValueForTokens(record, ["d1"])),
+    parseLikertScore(getValueForTokens(record, ["d2"])),
+    parseLikertScore(getValueForTokens(record, ["d3"])),
+    parseLikertScore(getValueForTokens(record, ["d4"])),
+    parseLikertScore(getValueForTokens(record, ["d5"])),
+    parseLikertScore(getValueForTokens(record, ["d6"])),
+  ]);
+
+  const descriptiveNorms = parseLikertScore(getValueForTokens(record, ["f1"]));
+  const injunctiveNorms = parseLikertScore(getValueForTokens(record, ["f2"]));
+
+  const systemReadiness = averageNumbers([
+    parseLikertScore(getValueForTokens(record, ["g1"])),
+    parseLikertScore(getValueForTokens(record, ["g2"])),
+    parseLikertScore(getValueForTokens(record, ["g3"])),
+  ]);
+
+  const promptLikelihood = parseLikertScore(getValueForTokens(record, ["e2"]));
+  const noPromptTokens = ["e1", "no", "prompts"] as const;
+
+  const facilitatorExposure = computePromptExposure(
+    record,
+    [
+      ["e1", "health", "worker"],
+      ["e1", "community", "religious"],
+    ],
+    { noPromptTokens: [...noPromptTokens] },
+  );
+
+  const sparkExposure = computePromptExposure(
+    record,
+    [["e1", "media"]],
+    { noPromptTokens: [...noPromptTokens] },
+  );
+
+  const signalExposure = computePromptExposure(
+    record,
+    [["e1", "partner", "spouse"]],
+    { noPromptTokens: [...noPromptTokens] },
+  );
+
+  let currentUse = parseBoolean(getValueForTokens(record, ["b2"]));
+  if (currentUse == null) {
+    const method = getValueForTokens(record, ["b3"]);
+    if (typeof method === "string" && method.trim().length > 0) {
+      currentUse = true;
+    }
+  }
+
+  return {
+    motivation,
+    ability,
+    descriptiveNorms,
+    injunctiveNorms,
+    systemReadiness,
+    promptFacilitator: facilitatorExposure ?? promptLikelihood ?? null,
+    promptSpark: sparkExposure ?? promptLikelihood ?? null,
+    promptSignal: signalExposure ?? promptLikelihood ?? null,
+    currentUse,
+  };
+}
+
 function lookupFieldValue(record: NormalizedRecord, field: FieldKey, fieldMap: FieldMap): unknown {
   const primaryKey = normalizeKeyName(fieldMap[field]);
 
@@ -335,15 +785,33 @@ export function normalizeSubmissions(
   return raw.map((item) => {
     const normalizedRecord = buildNormalizedRecord(item);
 
-    const motivation = parseNumber(lookupFieldValue(normalizedRecord, "motivation", fieldMap));
-    const ability = parseNumber(lookupFieldValue(normalizedRecord, "ability", fieldMap));
-    const descriptiveNorms = parseNumber(lookupFieldValue(normalizedRecord, "descriptiveNorms", fieldMap));
-    const injunctiveNorms = parseNumber(lookupFieldValue(normalizedRecord, "injunctiveNorms", fieldMap));
-    const systemReadiness = parseNumber(lookupFieldValue(normalizedRecord, "systemReadiness", fieldMap));
-    const currentUse = parseBoolean(lookupFieldValue(normalizedRecord, "currentUse", fieldMap));
-    const promptFacilitator = parseNumber(lookupFieldValue(normalizedRecord, "promptFacilitator", fieldMap));
-    const promptSpark = parseNumber(lookupFieldValue(normalizedRecord, "promptSpark", fieldMap));
-    const promptSignal = parseNumber(lookupFieldValue(normalizedRecord, "promptSignal", fieldMap));
+    const derived = deriveMetrics(normalizedRecord);
+
+    const motivation =
+      parseNumber(lookupFieldValue(normalizedRecord, "motivation", fieldMap)) ?? derived.motivation ?? null;
+    const ability =
+      parseNumber(lookupFieldValue(normalizedRecord, "ability", fieldMap)) ?? derived.ability ?? null;
+    const descriptiveNorms =
+      parseNumber(lookupFieldValue(normalizedRecord, "descriptiveNorms", fieldMap))
+        ?? derived.descriptiveNorms ?? null;
+    const injunctiveNorms =
+      parseNumber(lookupFieldValue(normalizedRecord, "injunctiveNorms", fieldMap))
+        ?? derived.injunctiveNorms ?? null;
+    const systemReadiness =
+      parseNumber(lookupFieldValue(normalizedRecord, "systemReadiness", fieldMap))
+        ?? derived.systemReadiness ?? null;
+    const currentUse =
+      parseBoolean(lookupFieldValue(normalizedRecord, "currentUse", fieldMap))
+        ?? derived.currentUse ?? null;
+    const promptFacilitator =
+      parseNumber(lookupFieldValue(normalizedRecord, "promptFacilitator", fieldMap))
+        ?? derived.promptFacilitator ?? null;
+    const promptSpark =
+      parseNumber(lookupFieldValue(normalizedRecord, "promptSpark", fieldMap))
+        ?? derived.promptSpark ?? null;
+    const promptSignal =
+      parseNumber(lookupFieldValue(normalizedRecord, "promptSignal", fieldMap))
+        ?? derived.promptSignal ?? null;
 
     const submissionTime = toISODate(
       typeof item._submission_time === "string"
@@ -577,8 +1045,27 @@ function parseBoolean(value: unknown): boolean | null {
   if (typeof value === "number") return value === 1 || value > 0;
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+    if ([
+      "n/a",
+      "na",
+      "not applicable",
+      "dont know",
+      "don't know",
+      "do not know",
+      "unknown",
+      "unsure",
+      "not sure",
+    ].includes(normalized)) {
+      return null;
+    }
     if (["yes", "true", "1", "y"].includes(normalized)) return true;
     if (["no", "false", "0", "n"].includes(normalized)) return false;
+    if (/\byes\b/.test(normalized)) return true;
+    if (/\bno\b/.test(normalized)) return false;
+    if (/\bnone\b/.test(normalized)) return false;
+    if (/\bnot using\b/.test(normalized) || /\bnot currently\b/.test(normalized)) return false;
+    if (/\busing\b/.test(normalized) && !/\bnot\b/.test(normalized)) return true;
   }
   return null;
 }
