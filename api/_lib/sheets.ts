@@ -48,11 +48,20 @@ function getServiceAccount(): ServiceAccountConfig {
     throw new Error("Missing required environment variable GOOGLE_SERVICE_ACCOUNT.");
   }
 
+  const normalizedRaw = raw.trim();
+  const jsonString =
+    (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")) ||
+    (normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'"))
+      ? normalizedRaw.slice(1, -1)
+      : normalizedRaw;
+
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(jsonString);
   } catch (error) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT must contain valid JSON credentials.");
+    throw new Error(
+      "GOOGLE_SERVICE_ACCOUNT must contain valid JSON credentials. Remove any surrounding quotes when pasting the JSON.",
+    );
   }
 
   const clientEmail = typeof parsed.client_email === "string" ? parsed.client_email : undefined;
