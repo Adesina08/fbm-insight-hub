@@ -107,7 +107,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       value: formatNumber(stats.totalRespondents.value),
       change: formatChange(stats.totalRespondents.change),
       trendIcon: Users,
-      gradient: "from-chart-1 to-chart-1/70",
       suffix: "",
     },
     {
@@ -115,7 +114,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       value: formatNumber(stats.currentUsers.value),
       change: formatChange(stats.currentUsers.change, " pp"),
       trendIcon: Target,
-      gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/70",
       suffix: "",
     },
     {
@@ -126,7 +124,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
           : stats.averageMotivation.value.toFixed(2),
       change: formatChange(stats.averageMotivation.change, ""),
       trendIcon: TrendingUp,
-      gradient: "from-chart-3 to-chart-3/70",
       suffix: " / 5",
     },
     {
@@ -137,7 +134,6 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
           : stats.averageAbility.value.toFixed(2),
       change: formatChange(stats.averageAbility.change, ""),
       trendIcon: Activity,
-      gradient: "from-warning to-warning/70",
       suffix: " / 5",
     },
   ];
