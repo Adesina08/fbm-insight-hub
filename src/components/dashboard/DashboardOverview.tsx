@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpRight, ArrowDownRight, Users, TrendingUp, Activity, Target, RefreshCcw } from "lucide-react";
-import type { DashboardAnalytics, QuadrantInsight } from "@/lib/kobo";
+import type { DashboardAnalytics, QuadrantInsight } from "@/lib/googleSheets";
 
 interface DashboardOverviewProps {
   stats?: DashboardAnalytics["stats"];
@@ -75,7 +75,7 @@ const LoadingState = () => (
 
 const ErrorState = ({ message, onRetry }: { message: string; onRetry?: () => void }) => (
   <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
-    <AlertTitle>Unable to load Kobo data</AlertTitle>
+    <AlertTitle>Unable to load Google Sheets data</AlertTitle>
     <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <span>{message}</span>
       {onRetry ? (
@@ -98,7 +98,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
   }
 
   if (!stats || !quadrants) {
-    return <ErrorState message="No Kobo responses are available yet." onRetry={onRetry} />;
+    return <ErrorState message="No Google Sheet rows are available yet." onRetry={onRetry} />;
   }
 
   const cards = [
@@ -147,7 +147,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            Last Kobo sync: <span className="font-medium text-foreground">{lastUpdatedLabel(lastUpdated)}</span>
+            Last Google Sheets sync: <span className="font-medium text-foreground">{lastUpdatedLabel(lastUpdated)}</span>
           </p>
           <p className="text-xs text-muted-foreground">Data refreshes automatically every minute.</p>
         </div>
@@ -268,7 +268,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">
-              Kobo submissions do not yet contain motivation and ability scores. Once they are provided, the quadrant analysis
+              Google Sheet rows do not yet contain motivation and ability scores. Once they are provided, the quadrant analysis
               will populate automatically.
             </div>
           )}

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { SegmentSummary } from "@/lib/kobo";
+import type { SegmentSummary } from "@/lib/googleSheets";
 
 interface SegmentProfilesProps {
   segments?: SegmentSummary[];
@@ -32,7 +32,7 @@ const LoadingState = () => (
 
 const EmptyState = () => (
   <div className="p-6 text-sm text-muted-foreground bg-muted/20 rounded-lg">
-    Segments will appear once Kobo submissions include both motivation and ability scores.
+    Segments will appear once Google Sheet rows include both motivation and ability scores.
   </div>
 );
 

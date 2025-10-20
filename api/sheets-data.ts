@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleOptionsRequest, sendError, setCorsHeaders } from "./_lib/kobo";
+import { handleOptionsRequest, sendError, setCorsHeaders } from "./_lib/http";
 import { convertSheetValuesToRecords, fetchSheetValues } from "./_lib/sheets";
 
-interface KoboLikeResponse {
+interface SheetsDataResponse {
   count: number;
   results: Array<Record<string, unknown>>;
 }
@@ -16,7 +16,7 @@ function getDataRange(): string {
   return range.trim();
 }
 
-function sendJson(res: ServerResponse, payload: KoboLikeResponse): void {
+function sendJson(res: ServerResponse, payload: SheetsDataResponse): void {
   setCorsHeaders(res);
   res.statusCode = 200;
   res.setHeader("Content-Type", "application/json");
