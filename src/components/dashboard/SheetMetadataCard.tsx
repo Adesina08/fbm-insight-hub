@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useKoboAssets } from "@/hooks/useKoboAssets";
+import { useSheetsMetadata } from "@/hooks/useSheetsMetadata";
 
 const formatRelativeTime = (value: string | null): string => {
   if (!value) return "—";
@@ -22,8 +22,8 @@ const formatAbsoluteTime = (value: string | null): string | undefined => {
   return new Date(timestamp).toLocaleString();
 };
 
-const KoboAssetList = () => {
-  const { data, isLoading, isError, error, refetch, isFetching } = useKoboAssets();
+const SheetMetadataCard = () => {
+  const { data, isLoading, isError, error, refetch, isFetching } = useSheetsMetadata();
 
   const absoluteLastUpdated = data ? formatAbsoluteTime(data.lastUpdated) : undefined;
   const relativeLastUpdated = data ? formatRelativeTime(data.lastUpdated) : "—";
@@ -164,4 +164,4 @@ const KoboAssetList = () => {
   );
 };
 
-export default KoboAssetList;
+export default SheetMetadataCard;

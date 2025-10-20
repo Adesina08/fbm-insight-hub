@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 
-import { handleOptionsRequest, sendError, setCorsHeaders } from "./_lib/kobo";
+import { handleOptionsRequest, sendError, setCorsHeaders } from "./_lib/http";
 import {
   convertSheetValuesToRecords,
   fetchSheetValues,

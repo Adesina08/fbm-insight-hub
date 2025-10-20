@@ -2,7 +2,7 @@ import { Info } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ModelSummary, RegressionInsight } from "@/lib/kobo";
+import type { ModelSummary, RegressionInsight } from "@/lib/googleSheets";
 
 interface PathDiagramProps {
   regression?: RegressionInsight[];
@@ -90,8 +90,8 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
           </div>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Provide Kobo fields for motivation, ability, norms, system readiness, and prompt effectiveness to unlock this
-          analysis.
+          Provide Google Sheet columns for motivation, ability, norms, system readiness, and prompt effectiveness to unlock
+          this analysis.
         </CardContent>
       </Card>
     );
@@ -177,8 +177,9 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
               <Info className="w-5 h-5 text-primary mt-0.5" />
               <div className="flex-1 space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Values represent differences in average scores between current users and non-users recorded through Kobo. Use
-                  the strongest drivers to prioritise programmatic responses and monitor change as new submissions arrive.
+                  Values represent differences in average scores between current users and non-users recorded through the
+                  connected Google Sheet. Use the strongest drivers to prioritise programmatic responses and monitor change as
+                  new submissions arrive.
                 </p>
                 <ul className="space-y-1 list-disc list-inside">
                   <li>Positive values indicate higher scores among current users.</li>

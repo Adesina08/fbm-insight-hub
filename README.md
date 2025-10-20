@@ -62,15 +62,15 @@ This project is built with:
 
 ## Connecting to Google Sheets
 
-The dashboard now reads live data from a Google Sheet. Each row is treated like a Kobo submission, so the analytics continue to work without code changes. To enable the integration:
+The dashboard now reads live data from a Google Sheet. Each row is treated like a survey submission, so the analytics continue to work without code changes. To enable the integration:
 
 1. Copy `.env.example` to `.env` and populate the following **server-side** variables (no `VITE_` prefix):
    - `GOOGLE_SERVICE_ACCOUNT` – the entire JSON credentials document for a service account with access to the sheet.
    - `GOOGLE_SHEETS_ID` – the spreadsheet ID (the segment between `/d/` and `/edit` in the sheet URL).
    - `GOOGLE_SHEETS_DATA_RANGE` – the A1 range that covers the header row and all submission rows (for example, `Form Responses!A:Z`).
-   - (Optional) override the frontend field mappings (`VITE_KOBO_FIELD_*`) if the column names in the sheet differ from the default Kobo question names.
+   - (Optional) override the frontend field mappings (`VITE_SHEETS_FIELD_*`) if the column names in the sheet differ from the default question names used in the analytics module.
 2. Share the sheet with the service account email so it can read values.
-3. Redeploy or restart `npm run dev` so the environment variables are picked up. The `/api/kobo-data` endpoint now streams rows from Google Sheets, and `/api/kobo-assets` exposes sheet metadata for the UI card.
+3. Redeploy or restart `npm run dev` so the environment variables are picked up. The `/api/sheets-data` endpoint now streams rows from Google Sheets, and `/api/sheets-metadata` exposes sheet metadata for the UI card.
 
 If the sheet cannot be reached, the UI surfaces descriptive error messages with retry actions.
 

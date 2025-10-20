@@ -196,7 +196,7 @@ export function resolveFieldMap(overrides?: Partial<FieldMap>): FieldMap {
   const envVars = import.meta.env as Record<string, string | undefined> | undefined;
 
   (Object.keys(map) as FieldKey[]).forEach((key) => {
-    const envKey = `VITE_KOBO_FIELD_${key.toUpperCase()}`;
+    const envKey = `VITE_SHEETS_FIELD_${key.toUpperCase()}`;
     const override = envVars?.[envKey];
     if (override && typeof override === "string" && override.trim().length > 0) {
       map[key] = override.trim();

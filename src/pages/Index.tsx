@@ -9,16 +9,16 @@ import UploadSection from "@/components/dashboard/UploadSection";
 import QuestionnaireReference from "@/components/dashboard/QuestionnaireReference";
 import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivenessHeatmap";
 import PathDiagram from "@/components/dashboard/PathDiagram";
-import { useKoboData } from "@/hooks/useKoboData";
+import { useSheetsAnalytics } from "@/hooks/useSheetsAnalytics";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
-  const { data, isLoading, isError, error, refetch, isFetching } = useKoboData();
+  const { data, isLoading, isError, error, refetch, isFetching } = useSheetsAnalytics();
   const syncStatus = useMemo(() => {
-    if (isLoading) return "Connecting to Kobo…";
+    if (isLoading) return "Connecting to Google Sheets…";
     if (isFetching) return "Syncing latest submissions…";
     if (isError) return error?.message ?? "Sync error";
-    return "Live data from Kobo";
+    return "Live data from Google Sheets";
   }, [error?.message, isError, isFetching, isLoading]);
 
   return (
