@@ -108,8 +108,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       change: formatChange(stats.totalRespondents.change),
       trendIcon: Users,
       gradient: "from-chart-1 to-chart-1/70",
-      suffix: " responses",
-      helper: "Change compares the latest half of submissions with the previous half.",
+      suffix: "",
     },
     {
       title: "Contraceptive Users",
@@ -117,26 +116,29 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       change: formatChange(stats.currentUsers.change, " pp"),
       trendIcon: Target,
       gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/70",
-      suffix: " respondents",
-      helper: "Positive change indicates growth in the proportion reporting current use.",
+      suffix: "",
     },
     {
       title: "Avg Motivation Score",
-      value: formatAverage(stats.averageMotivation.value),
+      value:
+        stats.averageMotivation.value == null || Number.isNaN(stats.averageMotivation.value)
+          ? "n/a"
+          : stats.averageMotivation.value.toFixed(2),
       change: formatChange(stats.averageMotivation.change, ""),
       trendIcon: TrendingUp,
       gradient: "from-chart-3 to-chart-3/70",
-      suffix: "",
-      helper: "Values are on a 1-5 scale.",
+      suffix: " / 5",
     },
     {
       title: "Avg Ability Score",
-      value: formatAverage(stats.averageAbility.value),
+      value:
+        stats.averageAbility.value == null || Number.isNaN(stats.averageAbility.value)
+          ? "n/a"
+          : stats.averageAbility.value.toFixed(2),
       change: formatChange(stats.averageAbility.change, ""),
       trendIcon: Activity,
       gradient: "from-warning to-warning/70",
-      suffix: "",
-      helper: "Values are on a 1-5 scale.",
+      suffix: " / 5",
     },
   ];
 
@@ -174,24 +176,27 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
                   <Icon className="h-5 w-5 text-white" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-2">
-                  {card.value}
-                  {card.suffix ? <span className="text-base font-medium text-muted-foreground">{card.suffix}</span> : null}
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  {change.trend === "up" && <ArrowUpRight className="h-4 w-4 text-quadrant-high-m-high-a" />}
-                  {change.trend === "down" && <ArrowDownRight className="h-4 w-4 text-destructive" />}
-                  <span className={
-                    change.trend === "up"
-                      ? "text-quadrant-high-m-high-a font-semibold"
-                      : change.trend === "down"
-                        ? "text-destructive font-semibold"
-                        : "text-muted-foreground"
-                  }>
-                    {change.text}
-                  </span>
-                  <span>{card.helper}</span>
+              <CardContent className="space-y-4">
+                <div className="flex items-baseline justify-between gap-4">
+                  <div className="text-3xl font-bold">
+                    {card.value}
+                    {card.suffix && card.value !== "n/a" ? (
+                      <span className="text-base font-medium text-muted-foreground">{card.suffix}</span>
+                    ) : null}
+                  </div>
+                  <div
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold bg-gradient-to-r ${
+                      change.trend === "up"
+                        ? "from-quadrant-high-m-high-a/20 to-quadrant-high-m-high-a/10 text-quadrant-high-m-high-a"
+                        : change.trend === "down"
+                          ? "from-destructive/20 to-destructive/10 text-destructive"
+                          : "from-muted/70 to-muted/40 text-muted-foreground"
+                    }`}
+                  >
+                    {change.trend === "up" && <ArrowUpRight className="h-4 w-4" />}
+                    {change.trend === "down" && <ArrowDownRight className="h-4 w-4" />}
+                    <span>{change.text}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
