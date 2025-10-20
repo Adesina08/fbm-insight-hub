@@ -1,8 +1,9 @@
+import { Fragment } from "react";
 import { Users } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { SegmentSummary } from "@/lib/googleSheets";
+import type { QuadrantId, SegmentSummary } from "@/lib/googleSheets";
 
 interface SegmentProfilesProps {
   segments?: SegmentSummary[];
@@ -10,36 +11,31 @@ interface SegmentProfilesProps {
   error?: string | null;
 }
 
-type SegmentProfile = {
-  name: string;
-  color: string;
-  values: Record<string, number>;
+const SEGMENT_COLORS: Record<QuadrantId, string> = {
+  high_m_high_a: "#22c55e",
+  high_m_low_a: "#f59e0b",
+  low_m_high_a: "#3b82f6",
+  low_m_low_a: "#ef4444",
 };
 
 const METRICS = ["Motivation", "Ability", "Norms", "System"] as const;
 
-const SEGMENT_PROFILES: SegmentProfile[] = [
-  {
-    name: "Empowered Adopters",
-    color: "#22c55e",
-    values: { Motivation: 4.5, Ability: 4.0, Norms: 4.2, System: 3.8 },
-  },
-  {
-    name: "Willing but Hindered",
-    color: "#f59e0b",
-    values: { Motivation: 3.0, Ability: 2.2, Norms: 3.5, System: 1.8 },
-  },
-  {
-    name: "Passive Resisters",
-    color: "#3b82f6",
-    values: { Motivation: 2.2, Ability: 2.8, Norms: 2.0, System: 2.5 },
-  },
-  {
-    name: "Isolated Non-Users",
-    color: "#ef4444",
-    values: { Motivation: 1.5, Ability: 1.8, Norms: 1.6, System: 1.2 },
-  },
-];
+type MetricLabel = (typeof METRICS)[number];
+
+const average = (values: Array<number | null | undefined>): number | null => {
+  const valid = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (valid.length === 0) {
+    return null;
+  }
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+};
+
+const formatMetric = (value: number | null) => {
+  if (value == null || Number.isNaN(value)) {
+    return "n/a";
+  }
+  return value.toFixed(2);
+};
 
 const LoadingState = () => (
   <div className="space-y-4">
@@ -57,25 +53,40 @@ const polarToCartesian = (angle: number, value: number, radius: number, center: 
   };
 };
 
-const RadarChart = ({ profile }: { profile: SegmentProfile }) => {
+const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
   const size = 240;
   const center = size / 2;
   const radius = size / 2 - 24;
   const angleStep = 360 / METRICS.length;
 
+  const normsAverage = average([
+    segment.characteristics.descriptiveNorms,
+    segment.characteristics.injunctiveNorms,
+  ]);
+
+  const metricValues: Record<MetricLabel, number | null> = {
+    Motivation: segment.characteristics.motivation,
+    Ability: segment.characteristics.ability,
+    Norms: normsAverage,
+    System: segment.characteristics.systemReadiness,
+  };
+
+  const strokeColor = SEGMENT_COLORS[segment.id] ?? "#6366f1";
+
   const points = METRICS.map((metric, index) => {
-    const { x, y } = polarToCartesian(index * angleStep, profile.values[metric], radius, center);
+    const value = metricValues[metric] ?? 0;
+    const { x, y } = polarToCartesian(index * angleStep, value, radius, center);
     return `${x},${y}`;
   }).join(" ");
 
   const gridRadii = [1, 2, 3, 4, 5];
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full" role="img" aria-label={`${profile.name} radar chart`}>
+    <svg viewBox={`0 0 ${size} ${size}`} className="w-full" role="img" aria-label={`${segment.name} radar chart`}>
       <defs>
-        <linearGradient id={`radar-fill-${profile.name.replace(/\s+/g, "-")}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={profile.color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={profile.color} stopOpacity="0.15" />
+        <linearGradient id={`radar-fill-${segment.id}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.15" />
         </linearGradient>
       </defs>
       <circle cx={center} cy={center} r={radius} fill="var(--card)" opacity="0.25" />
@@ -102,16 +113,17 @@ const RadarChart = ({ profile }: { profile: SegmentProfile }) => {
           </g>
         );
       })}
-      <polygon points={points} fill={`url(#radar-fill-${profile.name.replace(/\s+/g, "-")})`} stroke={profile.color} strokeWidth={3} />
+      <polygon points={points} fill={`url(#radar-fill-${segment.id})`} stroke={strokeColor} strokeWidth={3} />
       {METRICS.map((metric, index) => {
-        const { x, y } = polarToCartesian(index * angleStep, profile.values[metric], radius, center);
-        return <circle key={metric} cx={x} cy={y} r={5} fill={profile.color} stroke="#fff" strokeWidth={1.5} />;
+        const value = metricValues[metric] ?? 0;
+        const { x, y } = polarToCartesian(index * angleStep, value, radius, center);
+        return <circle key={metric} cx={x} cy={y} r={5} fill={strokeColor} stroke="#fff" strokeWidth={1.5} />;
       })}
     </svg>
   );
 };
 
-const SegmentProfiles = ({ isLoading = false, error }: SegmentProfilesProps) => {
+const SegmentProfiles = ({ segments, isLoading = false, error }: SegmentProfilesProps) => {
   if (isLoading) {
     return (
       <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
@@ -136,6 +148,21 @@ const SegmentProfiles = ({ isLoading = false, error }: SegmentProfilesProps) => 
     );
   }
 
+  if (!segments || segments.length === 0) {
+    return (
+      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">No segment insights available</CardTitle>
+          <CardDescription>
+            Submitters must include motivation, ability, norms, and system fields for segment analytics to render.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const totalRespondents = segments.reduce((sum, segment) => sum + segment.count, 0);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
@@ -147,25 +174,60 @@ const SegmentProfiles = ({ isLoading = false, error }: SegmentProfilesProps) => 
             <div>
               <CardTitle className="text-2xl">Behavioral Segments</CardTitle>
               <CardDescription className="text-base mt-1">
-                Radar charts replicating the provided segment profiles, including the system dimension
+                Radar charts derived from Google Sheets submissions showing average scores by segment
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
           <div className="grid gap-8 md:grid-cols-2">
-            {SEGMENT_PROFILES.map((profile) => (
-              <div key={profile.name} className="space-y-4">
-                <h3 className="text-lg font-semibold text-center text-foreground">{profile.name}</h3>
-                <div className="rounded-2xl border bg-background/70 p-4 shadow-inner">
-                  <RadarChart profile={profile} />
+            {segments.map((segment) => {
+              const normsAverage = average([
+                segment.characteristics.descriptiveNorms,
+                segment.characteristics.injunctiveNorms,
+              ]);
+
+              return (
+                <div key={segment.id} className="space-y-4">
+                  <div className="space-y-2 text-center">
+                    <h3 className="text-lg font-semibold text-foreground">{segment.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {segment.count} respondents ({segment.percentage.toFixed(1)}%) · Current use
+                      {" "}
+                      {segment.currentUseRate == null
+                        ? "n/a"
+                        : `${Math.round(segment.currentUseRate * 100)}%`}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border bg-background/70 p-4 shadow-inner">
+                    <RadarChart segment={segment} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
+                    {METRICS.map((metric) => {
+                      const value: number | null =
+                        metric === "Norms"
+                          ? normsAverage
+                          : metric === "Motivation"
+                            ? segment.characteristics.motivation
+                            : metric === "Ability"
+                              ? segment.characteristics.ability
+                              : segment.characteristics.systemReadiness;
+                      return (
+                        <Fragment key={`${segment.id}-${metric}`}>
+                          <span className="font-medium text-foreground">{metric}</span>
+                          <span>{formatMetric(value)}</span>
+                        </Fragment>
+                      );
+                    })}
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{segment.description}</p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <p className="text-sm text-muted-foreground">
-            These static profiles mirror the attached reference, offering a quick comparison of motivation, ability, norms, and
-            system readiness across all four behavioural segments.
+            Segment averages use all {totalRespondents} submissions that contained enough information to classify motivation,
+            ability, social norms, and system readiness.
           </p>
         </CardContent>
       </Card>
