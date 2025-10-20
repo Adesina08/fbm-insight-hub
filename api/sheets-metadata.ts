@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "http";
+import type { Request as FetchRequest } from "undici";
 
-import { handleOptionsRequest, sendError, setCorsHeaders } from "./_lib/http";
+import { handleOptionsRequest, jsonResponse, sendError, setCorsHeaders } from "./_lib/http";
 import {
   convertSheetValuesToRecords,
   fetchSheetValues,
@@ -99,7 +100,56 @@ function sendJson(res: ServerResponse, payload: SheetInfoResponse): void {
   res.end(JSON.stringify(payload));
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+function isFetchRequest(req: IncomingMessage | FetchRequest): req is FetchRequest {
+  return typeof (req as FetchRequest).method === "string" && typeof (req as FetchRequest).headers === "object";
+}
+
+async function handleFetchRequest(req: FetchRequest): Promise<Response> {
+  const optionsResponse = handleOptionsRequest(req);
+  if (optionsResponse) {
+    return optionsResponse;
+  }
+
+  if (req.method.toUpperCase() !== "GET") {
+    return sendError(405, "Method Not Allowed");
+  }
+
+  let range: string;
+  try {
+    range = getDataRange();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
+    return sendError(500, message);
+  }
+
+  try {
+    const [metadata, values] = await Promise.all([
+      fetchSpreadsheetMetadata(),
+      fetchSheetValues(range),
+    ]);
+
+    const headers = extractHeaders(values);
+    const records = convertSheetValuesToRecords(values);
+    const lastUpdated = computeLastUpdated(records);
+
+    return jsonResponse({
+      spreadsheetId: metadata.spreadsheetId,
+      spreadsheetUrl: metadata.spreadsheetUrl,
+      title: metadata.title,
+      timeZone: metadata.timeZone,
+      totalRows: records.length,
+      totalColumns: headers.length,
+      headers,
+      lastUpdated,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load Google Sheet metadata. Please try again later.";
+    return sendError(502, message);
+  }
+}
+
+async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (handleOptionsRequest(req, res)) {
     return;
   }
@@ -113,8 +163,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   try {
     range = getDataRange();
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Missing Google Sheets configuration.";
+    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
     sendError(res, 500, message);
     return;
   }
@@ -144,4 +193,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       error instanceof Error ? error.message : "Failed to load Google Sheet metadata. Please try again later.";
     sendError(res, 502, message);
   }
+}
+
+export default async function handler(
+  req: IncomingMessage | FetchRequest,
+  res?: ServerResponse,
+): Promise<Response | void> {
+  if (isFetchRequest(req)) {
+    return handleFetchRequest(req);
+  }
+
+  if (!res) {
+    throw new Error("ServerResponse is required for Node.js handlers.");
+  }
+
+  await handleNodeRequest(req, res);
 }
