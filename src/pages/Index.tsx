@@ -12,10 +12,10 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const { data, isLoading, isError, error, refetch, isFetching } = useSheetsAnalytics();
   const syncStatus = useMemo(() => {
-    if (isLoading) return "Connecting to Google Sheets…";
+    if (isLoading) return "Connecting to data source…";
     if (isFetching) return "Syncing latest submissions…";
     if (isError) return error?.message ?? "Sync error";
-    return "Live data from Google Sheets";
+    return "Live data from connected source";
   }, [error?.message, isError, isFetching, isLoading]);
 
   return (
