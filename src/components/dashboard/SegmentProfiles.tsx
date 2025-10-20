@@ -1,8 +1,9 @@
-import { Fragment } from "react";
-import { Users } from "lucide-react";
+import { ListChecks, Sparkles, Users } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import type { QuadrantId, SegmentSummary } from "@/lib/googleSheets";
 
 interface SegmentProfilesProps {
@@ -54,7 +55,7 @@ const polarToCartesian = (angle: number, value: number, radius: number, center: 
 };
 
 const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
-  const size = 240;
+  const size = 220;
   const center = size / 2;
   const radius = size / 2 - 24;
   const angleStep = 360 / METRICS.length;
@@ -186,41 +187,105 @@ const SegmentProfiles = ({ segments, isLoading = false, error }: SegmentProfiles
                 segment.characteristics.descriptiveNorms,
                 segment.characteristics.injunctiveNorms,
               ]);
+              const accent = SEGMENT_COLORS[segment.id] ?? "#6366f1";
+              const insights = segment.insights ?? [];
+              const recommendations = segment.recommendations ?? [];
+
+              const withAlpha = (hex: string, alpha: number) => {
+                const normalized = hex.replace("#", "");
+                const bigint = parseInt(normalized, 16);
+                if (Number.isNaN(bigint)) {
+                  return `rgba(99, 102, 241, ${alpha})`;
+                }
+                const r = (bigint >> 16) & 255;
+                const g = (bigint >> 8) & 255;
+                const b = bigint & 255;
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+              };
+
+              const accentSurface = withAlpha(accent, 0.12);
+              const accentBorder = withAlpha(accent, 0.35);
 
               return (
-                <div key={segment.id} className="space-y-4">
-                  <div className="space-y-2 text-center">
-                    <h3 className="text-lg font-semibold text-foreground">{segment.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {segment.count} respondents ({segment.percentage.toFixed(1)}%) · Current use
-                      {" "}
-                      {segment.currentUseRate == null
-                        ? "n/a"
-                        : `${Math.round(segment.currentUseRate * 100)}%`}
-                    </p>
+                <div
+                  key={segment.id}
+                  className="relative overflow-hidden rounded-3xl border bg-card/60 p-6 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+                  style={{ borderColor: accentBorder, background: `linear-gradient(135deg, ${accentSurface} 0%, transparent 70%)` }}
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">{segment.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {segment.count} respondents · {segment.percentage.toFixed(1)}% of total · Current use{" "}
+                        {segment.currentUseRate == null ? "n/a" : `${Math.round(segment.currentUseRate * 100)}%`}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className="bg-background/90 text-xs font-semibold uppercase tracking-wide text-foreground shadow"
+                    >
+                      {segment.id.replace(/_/g, " ").toUpperCase()}
+                    </Badge>
                   </div>
-                  <div className="rounded-2xl border bg-background/70 p-4 shadow-inner">
-                    <RadarChart segment={segment} />
+                  <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+                    <div className="rounded-2xl border border-white/10 bg-background/70 p-4 shadow-inner">
+                      <RadarChart segment={segment} />
+                    </div>
+                    <div className="space-y-6">
+                      <div className="grid gap-3">
+                        {METRICS.map((metric) => {
+                          const value: number | null =
+                            metric === "Norms"
+                              ? normsAverage
+                              : metric === "Motivation"
+                                ? segment.characteristics.motivation
+                                : metric === "Ability"
+                                  ? segment.characteristics.ability
+                                  : segment.characteristics.systemReadiness;
+                          const percentage =
+                            value == null || Number.isNaN(value) ? 0 : Math.min(100, Math.max(0, (value / 5) * 100));
+                          return (
+                            <div key={`${segment.id}-${metric}`} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                <span>{metric}</span>
+                                <span className="text-foreground">{formatMetric(value)}</span>
+                              </div>
+                              <Progress value={percentage} className="h-2 bg-background/60" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="space-y-3 text-sm">
+                        {insights.length > 0 ? (
+                          <div>
+                            <div className="mb-2 flex items-center gap-2 text-foreground">
+                              <Sparkles className="h-4 w-4" />
+                              <span className="text-xs font-semibold uppercase tracking-wide">Key insights</span>
+                            </div>
+                            <ul className="space-y-1 text-muted-foreground">
+                              {insights.map((insight) => (
+                                <li key={insight} className="leading-snug">• {insight}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {recommendations.length > 0 ? (
+                          <div>
+                            <div className="mb-2 flex items-center gap-2 text-foreground">
+                              <ListChecks className="h-4 w-4" />
+                              <span className="text-xs font-semibold uppercase tracking-wide">Recommended focus</span>
+                            </div>
+                            <ul className="space-y-1 text-muted-foreground">
+                              {recommendations.map((recommendation) => (
+                                <li key={recommendation} className="leading-snug">• {recommendation}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        <p className="text-sm text-muted-foreground leading-relaxed">{segment.description}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
-                    {METRICS.map((metric) => {
-                      const value: number | null =
-                        metric === "Norms"
-                          ? normsAverage
-                          : metric === "Motivation"
-                            ? segment.characteristics.motivation
-                            : metric === "Ability"
-                              ? segment.characteristics.ability
-                              : segment.characteristics.systemReadiness;
-                      return (
-                        <Fragment key={`${segment.id}-${metric}`}>
-                          <span className="font-medium text-foreground">{metric}</span>
-                          <span>{formatMetric(value)}</span>
-                        </Fragment>
-                      );
-                    })}
-                  </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{segment.description}</p>
                 </div>
               );
             })}

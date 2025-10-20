@@ -2,6 +2,7 @@ import { Info } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import type { PromptEffectivenessRow } from "@/lib/googleSheets";
 
 interface PromptEffectivenessHeatmapProps {
@@ -91,12 +92,18 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
   const preliminaryMax = Math.max(5, maxValue);
   const scaleMax = scaleMin === preliminaryMax ? scaleMin + 1 : preliminaryMax;
 
-  const getCellColor = (value: number | null) => {
+  const getCellVisuals = (value: number | null) => {
     if (value == null || Number.isNaN(value)) {
-      return "var(--muted)";
+      return {
+        background: "var(--muted)",
+        text: "var(--muted-foreground)",
+      };
     }
     const ratio = (value - scaleMin) / (scaleMax - scaleMin);
-    return lerpColor(ratio, "#dbeafe", "#1e3a8a");
+    return {
+      background: lerpColor(ratio, "#dbeafe", "#1e3a8a"),
+      text: ratio > 0.55 ? "#f8fafc" : "#0f172a",
+    };
   };
 
   let topCell: { segment: string; prompt: string; value: number } | null = null;
@@ -125,79 +132,89 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="relative overflow-hidden rounded-xl border bg-background/80 shadow-inner">
-          <svg viewBox="0 0 600 440" className="w-full h-full" role="img" aria-labelledby="heatmap-title">
-            <title id="heatmap-title">
-              Prompt effectiveness heatmap showing average facilitator, spark, and signal scores by behavioural segment
-            </title>
-            <text x="300" y="35" textAnchor="middle" fontSize="24" fontWeight="600" fill="var(--foreground)">
-              Prompt Effectiveness by Segment
-            </text>
-            <g transform="translate(120, 80)">
-              {rows.map((row, rowIndex) => (
-                <text
-                  key={row.id}
-                  x={-10}
-                  y={rowIndex * 80 + 45}
-                  fontSize="16"
-                  fill="var(--muted-foreground)"
-                  textAnchor="end"
-                >
-                  {row.name}
-                </text>
-              ))}
-              {PROMPT_FIELDS.map(({ label }, colIndex) => (
-                <text
-                  key={label}
-                  x={colIndex * 140 + 70}
-                  y={-20}
-                  fontSize="16"
-                  fill="var(--muted-foreground)"
-                  textAnchor="middle"
-                >
-                  {label}
-                </text>
-              ))}
-              {rows.map((row, rowIndex) =>
-                PROMPT_FIELDS.map(({ key, label }, colIndex) => {
-                  const value = row[key] ?? null;
-                  return (
-                    <g key={`${row.id}-${label}`} transform={`translate(${colIndex * 140}, ${rowIndex * 80})`}>
-                      <rect width="140" height="80" rx="12" fill={getCellColor(value)} opacity="0.95" />
-                      <text
-                        x="70"
-                        y="48"
-                        fontSize="22"
-                        fontWeight="600"
-                        fill={value != null && value >= (scaleMin + scaleMax) / 2 ? "#fff" : "#0f172a"}
-                        textAnchor="middle"
+        <div className="rounded-2xl border bg-background/85 p-4 shadow-inner">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[540px] table-fixed border-separate border-spacing-0 text-sm">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 rounded-tl-xl bg-background/95 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Segment
+                  </th>
+                  {PROMPT_FIELDS.map(({ label }, index) => {
+                    const isLast = index === PROMPT_FIELDS.length - 1;
+                    return (
+                      <th
+                        key={label}
+                        className={`bg-background/95 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground ${
+                          isLast ? "rounded-tr-xl" : ""
+                        }`}
                       >
-                        {formatCellValue(value)}
-                      </text>
-                    </g>
-                  );
-                }),
-              )}
-            </g>
-            <g transform="translate(480, 90)">
-              {[0, 0.25, 0.5, 0.75, 1].map((step) => (
-                <g key={step} transform={`translate(0, ${step * 100})`}>
-                  <rect x="0" y="0" width="18" height="18" rx="4" fill={lerpColor(step, "#dbeafe", "#1e3a8a")} />
-                  <text x="28" y="14" fontSize="14" fill="var(--muted-foreground)">
-                    {formatCellValue(scaleMin + (scaleMax - scaleMin) * step)}
-                  </text>
-                </g>
-              ))}
-              <text x="0" y="-16" fontSize="14" fill="var(--muted-foreground)" fontWeight="500">
-                Average score
-              </text>
-            </g>
-          </svg>
+                        {label}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, rowIndex) => (
+                  <tr key={row.id} className="border-t border-border/60">
+                    <th
+                      scope="row"
+                      className={`sticky left-0 bg-background/90 px-4 py-4 text-left text-sm font-semibold text-foreground ${
+                        rowIndex === rows.length - 1 ? "rounded-bl-xl" : ""
+                      }`}
+                    >
+                      {row.name}
+                    </th>
+                    {PROMPT_FIELDS.map(({ key, label }) => {
+                      const value = row[key] ?? null;
+                      const visuals = getCellVisuals(value);
+                      return (
+                        <td key={`${row.id}-${label}`} className="px-3 py-3">
+                          <div
+                            className="flex min-h-[88px] flex-col items-center justify-center rounded-xl border border-white/10 shadow-sm"
+                            style={{
+                              background: visuals.background,
+                              color: visuals.text,
+                            }}
+                          >
+                            <span className="text-lg font-semibold">{formatCellValue(value)}</span>
+                            <span className="text-[11px] uppercase tracking-wide opacity-80">Avg score</span>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="p-4 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
-          {topCell
-            ? `${topCell.prompt} prompts score highest with ${topCell.segment} (${topCell.value.toFixed(2)} / 5).`
-            : "Prompt scores were present but no numeric values could be summarised."}
+        <div className="flex flex-col gap-4 rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Scale</span>
+            <div className="h-2 w-36 rounded-full bg-gradient-to-r from-[#dbeafe] via-[#60a5fa] to-[#1e3a8a]" />
+            <div className="flex items-center gap-2 text-xs">
+              <span>Low</span>
+              <span className="font-semibold text-foreground">High</span>
+            </div>
+          </div>
+          {topCell ? (
+            <Badge variant="secondary" className="w-fit bg-background/80 px-4 py-2 text-xs font-medium text-foreground shadow-sm">
+              {topCell.prompt} prompts resonate most with {topCell.segment} ({topCell.value.toFixed(2)} / 5)
+            </Badge>
+          ) : null}
+        </div>
+        <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+          <p className="text-foreground">
+            {topCell
+              ? `${topCell.prompt} prompts score highest with ${topCell.segment} (${topCell.value.toFixed(2)} / 5).`
+              : "Prompt scores were present but no numeric values could be summarised."}
+          </p>
+          <p className="mt-2 text-xs">
+            Scores span the observed range of {formatCellValue(scaleMin)} to {formatCellValue(scaleMax)}, with deeper blues
+            representing stronger average responses.
+          </p>
         </div>
       </CardContent>
     </Card>
