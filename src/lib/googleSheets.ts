@@ -106,7 +106,7 @@ function parseJsonResponse(rawBody: string, contentType: string, context: string
     const preview = summarizeBody(rawBody);
     const typeLabel = contentType || "unknown";
     throw new Error(
-      `Unexpected response from the Google Sheets ${context} endpoint. Expected JSON but received content-type "${typeLabel}". Response preview: ${preview}`,
+      `Unexpected response from the analytics ${context} endpoint. Expected JSON but received content-type "${typeLabel}". Response preview: ${preview}`,
     );
   }
 
@@ -120,7 +120,7 @@ function parseJsonResponse(rawBody: string, contentType: string, context: string
     const message = error instanceof Error && error.message ? error.message : "Unknown parser error.";
     const preview = summarizeBody(rawBody);
     throw new Error(
-      `Failed to parse Google Sheets ${context} response as JSON (${message}). Response preview: ${preview}`,
+      `Failed to parse analytics ${context} response as JSON (${message}). Response preview: ${preview}`,
     );
   }
 }
@@ -191,7 +191,7 @@ export async function fetchSheetsAnalytics(): Promise<DashboardAnalytics> {
   const rawBody = await response.text();
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Google Sheets data (${response.status}): ${summarizeBody(rawBody)}`);
+    throw new Error(`Failed to fetch analytics data (${response.status}): ${summarizeBody(rawBody)}`);
   }
 
   const payload = parseJsonResponse(rawBody, contentType, "data");

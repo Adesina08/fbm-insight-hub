@@ -175,7 +175,7 @@ const SegmentProfiles = ({ segments, isLoading = false, error }: SegmentProfiles
             <div>
               <CardTitle className="text-2xl">Behavioral Segments</CardTitle>
               <CardDescription className="text-base mt-1">
-                Radar charts derived from Google Sheets submissions showing average scores by segment
+                Radar charts derived from recent submissions showing average scores by segment
               </CardDescription>
             </div>
           </div>

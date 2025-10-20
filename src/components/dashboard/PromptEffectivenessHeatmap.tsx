@@ -126,7 +126,7 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
           <div>
             <CardTitle className="text-2xl">Prompt Effectiveness by Segment</CardTitle>
             <CardDescription className="text-base mt-1">
-              Average prompt scores derived from the latest Google Sheets responses (1–5 scale)
+              Average prompt scores derived from the latest submissions (1–5 scale)
             </CardDescription>
           </div>
         </div>

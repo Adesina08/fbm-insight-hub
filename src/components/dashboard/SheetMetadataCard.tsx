@@ -81,7 +81,7 @@ const SheetMetadataCard = () => {
             <AlertTitle>No spreadsheet detected</AlertTitle>
             <AlertDescription>
               Configure GOOGLE_SHEETS_ID, GOOGLE_SHEETS_DATA_RANGE, and GOOGLE_SERVICE_ACCOUNT on the backend to enable the
-              Google Sheets integration.
+              analytics spreadsheet integration.
             </AlertDescription>
           </Alert>
         ) : (
@@ -95,7 +95,7 @@ const SheetMetadataCard = () => {
                     target="_blank"
                     rel="noreferrer"
                     className="text-primary hover:text-primary/80"
-                    aria-label={`Open ${data.title} in Google Sheets`}
+                    aria-label={`Open ${data.title} in the source spreadsheet`}
                   >
                     <ExternalLink className="h-4 w-4" />
                   </a>

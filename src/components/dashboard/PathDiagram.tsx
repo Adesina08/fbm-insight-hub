@@ -515,7 +515,7 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
           <div>
             <CardTitle className="text-2xl">Predictors of Contraceptive Use</CardTitle>
             <CardDescription className="text-base mt-1">
-              Dynamic path diagram using derived betas from Google Sheets submissions
+              Dynamic path diagram using derived betas from recent submissions
             </CardDescription>
           </div>
         </div>
