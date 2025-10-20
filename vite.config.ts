@@ -3,10 +3,6 @@ import type { PluginOption } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-
 export default defineConfig(({ mode }) => {
   const plugins: PluginOption[] = [react()];
 
@@ -14,10 +10,21 @@ export default defineConfig(({ mode }) => {
     plugins.push(componentTagger());
     plugins.push({
       name: "api-middleware",
-      configureServer(server) {
-        // Include the .ts extension so Node/Vite can resolve the TypeScript modules.
-        const sheetsData = require("./api/sheets-data.ts").default;
-        const sheetsMeta = require("./api/sheets-metadata.ts").default;
+      async configureServer(server) {
+        let sheetsDataHandler: any;
+        let sheetsMetaHandler: any;
+
+        async function loadHandlers() {
+          if (!sheetsDataHandler || !sheetsMetaHandler) {
+            const [dataModule, metaModule] = await Promise.all([
+              import("./api/sheets-data.ts"),
+              import("./api/sheets-metadata.ts"),
+            ]);
+
+            sheetsDataHandler = dataModule.default;
+            sheetsMetaHandler = metaModule.default;
+          }
+        }
 
         server.middlewares.use(async (req, res, next) => {
           const rawUrl = req.url?.split("?")[0] ?? "";
@@ -27,14 +34,16 @@ export default defineConfig(({ mode }) => {
           const url = strippedUrl.startsWith("/") ? strippedUrl : `/${strippedUrl}`;
           const method = req.method?.toUpperCase();
 
-          if (method === "GET" && url === "/api/sheets-data") {
-            await sheetsData(req, res);
-            return;
-          }
+          if (
+            method === "GET" &&
+            (url === "/api/sheets-data" || url === "/api/sheets-metadata")
+          ) {
+            await loadHandlers();
+            if (url === "/api/sheets-data") {
+              return sheetsDataHandler(req, res);
+            }
 
-          if (method === "GET" && url === "/api/sheets-metadata") {
-            await sheetsMeta(req, res);
-            return;
+            return sheetsMetaHandler(req, res);
           }
 
           return next();
