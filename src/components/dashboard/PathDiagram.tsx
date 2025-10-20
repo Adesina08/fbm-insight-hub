@@ -30,6 +30,20 @@ const average = (values: Array<number | null | undefined>): number | null => {
   return valid.reduce((sum, value) => sum + value, 0) / valid.length;
 };
 
+const median = (values: Array<number | null | undefined>): number | null => {
+  const valid = values
+    .filter((value): value is number => value != null && Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (valid.length === 0) {
+    return null;
+  }
+  const middle = Math.floor(valid.length / 2);
+  if (valid.length % 2 === 0) {
+    return (valid[middle - 1] + valid[middle]) / 2;
+  }
+  return valid[middle];
+};
+
 const formatBeta = (value: number | null | undefined) => {
   if (value == null || Number.isNaN(value)) {
     return "n/a";
@@ -51,6 +65,69 @@ const formatEdgeLabel = (beta: number | null | undefined, pValue?: string | null
   }
   const pLabel = formatPValue(pValue);
   return `β = ${formatBeta(beta)} (p = ${pLabel})`;
+};
+
+const parsePValueNumber = (value?: string | null): number | null => {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.trim().match(/([0-9]*\.?[0-9]+(?:e-?[0-9]+)?)/i);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+type SignificanceLevel = "high" | "moderate" | "low" | "borderline" | "unknown";
+
+const getSignificanceLevel = (pValue: number | null): SignificanceLevel => {
+  if (pValue == null) {
+    return "unknown";
+  }
+  if (pValue < 0.001) {
+    return "high";
+  }
+  if (pValue < 0.01) {
+    return "moderate";
+  }
+  if (pValue < 0.05) {
+    return "low";
+  }
+  if (pValue < 0.1) {
+    return "borderline";
+  }
+  return "unknown";
+};
+
+const SIGNIFICANCE_META: Record<SignificanceLevel, { label: string; helper: string; badgeClass: string }> = {
+  high: {
+    label: "Highly significant",
+    helper: "p < 0.001",
+    badgeClass: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+  },
+  moderate: {
+    label: "Strong evidence",
+    helper: "p < 0.01",
+    badgeClass: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  },
+  low: {
+    label: "Statistically significant",
+    helper: "p < 0.05",
+    badgeClass: "bg-lime-50 text-lime-700 border border-lime-200",
+  },
+  borderline: {
+    label: "Borderline",
+    helper: "p < 0.1",
+    badgeClass: "bg-amber-50 text-amber-700 border border-amber-200",
+  },
+  unknown: {
+    label: "Not significant / n/a",
+    helper: "p ≥ 0.1 or unavailable",
+    badgeClass: "bg-slate-100 text-slate-600 border border-slate-200",
+  },
 };
 
 const findInsight = (regression: RegressionInsight[] | undefined, variable: string) =>
@@ -248,6 +325,108 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
     });
   }
 
+  const betaValues = regression.map((insight) => insight.beta ?? null);
+  const medianBeta = median(betaValues);
+
+  const sortedPositive = regression
+    .filter((insight) => (insight.beta ?? null) != null && Number.isFinite(insight.beta ?? null) && (insight.beta ?? 0) > 0)
+    .sort((a, b) => (b.beta ?? 0) - (a.beta ?? 0));
+
+  const sortedNegative = regression
+    .filter((insight) => (insight.beta ?? null) != null && Number.isFinite(insight.beta ?? null) && (insight.beta ?? 0) < 0)
+    .sort((a, b) => (a.beta ?? 0) - (b.beta ?? 0));
+
+  const strongestPositive = sortedPositive[0] ?? null;
+  const strongestNegative = sortedNegative[0] ?? null;
+
+  const totalPredictors = regression.length;
+
+  const significanceTally = regression.reduce(
+    (acc, insight) => {
+      const numericP = parsePValueNumber(insight.pValue);
+      const level = getSignificanceLevel(numericP);
+      acc[level] += 1;
+      if (numericP != null) {
+        acc.reported += 1;
+      }
+      return acc;
+    },
+    { high: 0, moderate: 0, low: 0, borderline: 0, unknown: 0, reported: 0 },
+  );
+
+  const reportedPredictors = significanceTally.reported;
+  const clearlySignificant = significanceTally.high + significanceTally.moderate + significanceTally.low;
+  const borderlinePredictors = significanceTally.borderline;
+  const shareSignificant = reportedPredictors > 0 ? (clearlySignificant / reportedPredictors) * 100 : null;
+
+  const promptCoverage = [sparkInsight, facilitatorInsight, signalInsight].filter((item) => item != null).length;
+
+  const significanceLevels: SignificanceLevel[] = ["high", "moderate", "low", "borderline", "unknown"];
+
+  const insightHighlights = [
+    strongestPositive
+      ? `${strongestPositive.variable} shows the strongest positive effect (${formatBeta(strongestPositive.beta)}) on contraceptive use.`
+      : null,
+    strongestNegative
+      ? `${strongestNegative.variable} is the largest friction in the model (${formatBeta(strongestNegative.beta)}).`
+      : null,
+    promptsAverage != null
+      ? `Prompt levers collectively average ${formatBeta(promptsAverage)}, reinforcing the role of communications alongside psychosocial drivers.`
+      : null,
+    dominantNorm
+      ? `${dominantNorm.variable} currently leads the norms construct with ${formatBeta(dominantNorm.beta)}.`
+      : null,
+    shareSignificant != null
+      ? `${shareSignificant.toFixed(0)}% of predictors with reported p-values reach conventional significance (p < 0.05).`
+      : null,
+    borderlinePredictors > 0
+      ? `${borderlinePredictors} predictors sit in the borderline band (0.05 ≤ p < 0.1) and may respond to additional data.`
+      : null,
+  ].filter((item): item is string => typeof item === "string" && item.length > 0);
+
+  const highlightCards = [
+    {
+      title: "Predictors analysed",
+      value: totalPredictors > 0 ? totalPredictors.toString() : "—",
+      helper:
+        reportedPredictors > 0
+          ? `${reportedPredictors} include significance tests`
+          : "Awaiting significance statistics",
+      accent: "from-sky-100 via-sky-50 to-blue-100 text-sky-900 border-sky-200",
+    },
+    {
+      title: "Strongest accelerator",
+      value: strongestPositive?.variable ?? "Not detected",
+      helper: strongestPositive
+        ? `β = ${formatBeta(strongestPositive.beta)} · p = ${formatPValue(strongestPositive.pValue)}`
+        : "No positive betas yet",
+      accent: "from-emerald-100 via-emerald-50 to-teal-100 text-emerald-900 border-emerald-200",
+    },
+    {
+      title: "Strongest friction",
+      value: strongestNegative?.variable ?? "Not detected",
+      helper: strongestNegative
+        ? `β = ${formatBeta(strongestNegative.beta)} · p = ${formatPValue(strongestNegative.pValue)}`
+        : "No negative betas yet",
+      accent: "from-rose-100 via-rose-50 to-red-100 text-rose-900 border-rose-200",
+    },
+    {
+      title: "Median β",
+      value: medianBeta != null ? formatBeta(medianBeta) : "n/a",
+      helper:
+        shareSignificant != null
+          ? `${shareSignificant.toFixed(0)}% significant among tested predictors`
+          : "Add p-values to monitor certainty",
+      accent: "from-indigo-100 via-indigo-50 to-purple-100 text-indigo-900 border-indigo-200",
+    },
+  ];
+
+  const promptDetails = [
+    { key: "spark", label: "Spark prompts", insight: sparkInsight },
+    { key: "facilitator", label: "Facilitator prompts", insight: facilitatorInsight },
+    { key: "signal", label: "Signal prompts", insight: signalInsight },
+  ] as const;
+
   const createCurvePath = (
     from: { x: number; y: number; width: number; height: number },
     to: { x: number; y: number; width: number; height: number },
@@ -341,7 +520,19 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-8">
+      <CardContent className="space-y-10">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {highlightCards.map((card) => (
+            <div
+              key={card.title}
+              className={`rounded-2xl border bg-gradient-to-br ${card.accent} p-4 shadow-sm shadow-primary/10`}
+            >
+              <p className="text-sm font-medium text-slate-600">{card.title}</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{card.value}</p>
+              <p className="mt-3 text-xs text-slate-700/80">{card.helper}</p>
+            </div>
+          ))}
+        </div>
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <div className="rounded-2xl border bg-background/70 p-4 shadow-inner">
             <svg
@@ -534,32 +725,122 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
                 </dl>
               </div>
             ) : null}
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold text-foreground">Regression insights</h3>
-              <ul className="space-y-3">
-                {regressionByStrength.map((insight) => (
-                  <li key={insight.variable} className="rounded-lg border bg-background/70 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{insight.variable}</p>
-                        <p className="text-xs text-muted-foreground">Strength: {insight.strength}</p>
+            {insightHighlights.length > 0 ? (
+              <div className="rounded-2xl border bg-background/70 p-4 space-y-3">
+                <h3 className="text-lg font-semibold text-foreground">Quick takeaways</h3>
+                <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+                  {insightHighlights.map((item, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="mt-1 h-2 w-2 flex-none rounded-full bg-primary" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border bg-background/70 p-5 space-y-4">
+            <h3 className="text-lg font-semibold text-foreground">Significance breakdown</h3>
+            <dl className="space-y-3">
+              {significanceLevels.map((level) => (
+                <div
+                  key={level}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-muted bg-background/80 px-3 py-2.5"
+                >
+                  <div>
+                    <dt className="text-sm font-medium text-foreground">{SIGNIFICANCE_META[level].label}</dt>
+                    <dd className="text-xs text-muted-foreground">{SIGNIFICANCE_META[level].helper}</dd>
+                  </div>
+                  <span className="text-lg font-semibold text-foreground">
+                    {significanceTally[level]}
+                  </span>
+                </div>
+              ))}
+            </dl>
+            <p className="text-xs text-muted-foreground">
+              {reportedPredictors > 0
+                ? `${shareSignificant?.toFixed(0) ?? 0}% of tested predictors clear the p < 0.05 threshold.`
+                : "Provide p-values to unlock significance monitoring."}
+            </p>
+          </div>
+          <div className="rounded-2xl border bg-background/70 p-5 space-y-4">
+            <h3 className="text-lg font-semibold text-foreground">Prompt coverage</h3>
+            <p className="text-sm text-muted-foreground">
+              {promptCoverage === promptDetails.length
+                ? "All prompt families have regression coefficients."
+                : `${promptCoverage} of ${promptDetails.length} prompt families currently have betas.`}
+            </p>
+            <ul className="space-y-3">
+              {promptDetails.map((detail) => {
+                const beta = detail.insight?.beta ?? null;
+                const numericP = parsePValueNumber(detail.insight?.pValue);
+                const level = getSignificanceLevel(numericP);
+                return (
+                  <li key={detail.key} className="rounded-xl border bg-background/80 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">{detail.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {detail.insight?.interpretation ?? "No responses mapped yet."}
+                        </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-foreground">β = {formatBeta(insight.beta)}</p>
-                        <p className="text-xs text-muted-foreground">p = {insight.pValue ?? "n/a"}</p>
+                      <div className="text-right space-y-2">
+                        <p className="text-sm font-semibold text-foreground">β = {formatBeta(beta)}</p>
+                        <span
+                          className={`inline-flex items-center justify-end rounded-full px-2 py-0.5 text-[11px] font-medium ${SIGNIFICANCE_META[level].badgeClass}`}
+                        >
+                          {detail.insight?.pValue ? `p = ${formatPValue(detail.insight?.pValue)}` : "p-value n/a"}
+                        </span>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{insight.interpretation}</p>
                   </li>
-                ))}
-              </ul>
-              {promptsAverage != null ? (
-                <p className="text-xs text-muted-foreground">
-                  Average prompt beta across facilitator, spark, and signal items: {formatBeta(promptsAverage)}
-                </p>
-              ) : null}
-            </div>
+                );
+              })}
+            </ul>
           </div>
+        </div>
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-foreground">Regression insights</h3>
+          <ul className="space-y-3">
+            {regressionByStrength.map((insight) => {
+              const numericP = parsePValueNumber(insight.pValue);
+              const level = getSignificanceLevel(numericP);
+              return (
+                <li key={insight.variable} className="rounded-2xl border bg-background/80 p-4 shadow-sm shadow-muted/30">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{insight.variable}</p>
+                      <p className="text-xs text-muted-foreground">Strength: {insight.strength}</p>
+                    </div>
+                    <div className="text-right space-y-2">
+                      <p className="text-base font-semibold text-foreground">β = {formatBeta(insight.beta)}</p>
+                      <div className="flex items-center justify-end gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${SIGNIFICANCE_META[level].badgeClass}`}
+                        >
+                          {SIGNIFICANCE_META[level].label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">p = {insight.pValue ?? "n/a"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{insight.interpretation}</p>
+                </li>
+              );
+            })}
+          </ul>
+          {promptsAverage != null ? (
+            <p className="text-xs text-muted-foreground">
+              Average prompt beta across facilitator, spark, and signal items: {formatBeta(promptsAverage)}
+            </p>
+          ) : null}
+          {borderlinePredictors > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {borderlinePredictors} predictors fall into the borderline significance band (0.05 ≤ p &lt; 0.1).
+            </p>
+          ) : null}
         </div>
       </CardContent>
     </Card>
