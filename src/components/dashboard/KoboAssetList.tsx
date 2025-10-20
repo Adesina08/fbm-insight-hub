@@ -1,21 +1,12 @@
-import { useMemo } from "react";
 import { RefreshCw, ExternalLink } from "lucide-react";
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useKoboAssets } from "@/hooks/useKoboAssets";
 import { formatDistanceToNow } from "date-fns";
 
-const formatLabel = (value: string): string =>
-  value
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ") || value;
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useKoboAssets } from "@/hooks/useKoboAssets";
 
 const formatRelativeTime = (value: string | null): string => {
   if (!value) return "—";
@@ -34,15 +25,18 @@ const formatAbsoluteTime = (value: string | null): string | undefined => {
 const KoboAssetList = () => {
   const { data, isLoading, isError, error, refetch, isFetching } = useKoboAssets();
 
-  const emptyState = useMemo(() => !isLoading && data.length === 0, [data.length, isLoading]);
+  const absoluteLastUpdated = data ? formatAbsoluteTime(data.lastUpdated) : undefined;
+  const relativeLastUpdated = data ? formatRelativeTime(data.lastUpdated) : "—";
+  const headers = data?.headers ?? [];
+  const headerPreview = headers.slice(0, 16);
 
   return (
     <Card className="border-primary/20 shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <CardTitle>Connected Kobo Projects</CardTitle>
+          <CardTitle>Connected Google Sheet</CardTitle>
           <CardDescription>
-            Assets accessible with the configured Kobo API token. Select a project UID to use for live analytics.
+            Live analytics are sourced from this spreadsheet. Update the sheet to refresh insights in the dashboard.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={refetch} disabled={isFetching} className="gap-2">
@@ -53,113 +47,117 @@ const KoboAssetList = () => {
       <CardContent>
         {isLoading ? (
           <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="grid gap-2 md:grid-cols-5 items-center">
-                <Skeleton className="h-6 w-full md:col-span-2" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-              </div>
-            ))}
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-6 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-6 w-20" />
+              ))}
+            </div>
           </div>
         ) : isError ? (
           <Alert variant="destructive" className="flex items-start gap-3">
             <div>
-              <AlertTitle>Unable to load Kobo assets</AlertTitle>
+              <AlertTitle>Unable to load sheet metadata</AlertTitle>
               <AlertDescription>{error?.message ?? "Unknown error"}</AlertDescription>
             </div>
             <Button variant="secondary" size="sm" onClick={refetch} className="ml-auto">
               Try again
             </Button>
           </Alert>
-        ) : emptyState ? (
+        ) : !data ? (
           <Alert>
-            <AlertTitle>No projects detected</AlertTitle>
+            <AlertTitle>No spreadsheet detected</AlertTitle>
             <AlertDescription>
-              Your Kobo token is valid but no assets are available yet. Create a form in Kobo or request access to an
-              existing project, then refresh this list.
+              Configure GOOGLE_SHEETS_ID, GOOGLE_SHEETS_DATA_RANGE, and GOOGLE_SERVICE_ACCOUNT on the backend to enable the
+              Google Sheets integration.
             </AlertDescription>
           </Alert>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Type &amp; Deployment</TableHead>
-                <TableHead>Sharing</TableHead>
-                <TableHead className="text-right">Submissions</TableHead>
-                <TableHead>Last activity</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((asset) => {
-                const lastSubmission = formatRelativeTime(asset.lastSubmissionTime);
-                const lastSubmissionTitle = formatAbsoluteTime(asset.lastSubmissionTime);
-                const modifiedRelative = formatRelativeTime(asset.dateModified);
-                const modifiedTitle = formatAbsoluteTime(asset.dateModified);
-                return (
-                  <TableRow key={asset.uid} className="bg-card/60">
-                    <TableCell>
-                      <div className="flex items-center gap-2 font-medium">
-                        {asset.name}
-                        {asset.url ? (
-                          <a
-                            href={asset.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-primary hover:text-primary/80"
-                            aria-label={`Open ${asset.name} in Kobo`}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        UID: {asset.uid}
-                        {asset.ownerUsername ? ` · Owner: ${asset.ownerUsername}` : ""}
-                        {asset.tagString ? ` · Tags: ${asset.tagString}` : ""}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary">{formatLabel(asset.assetType)}</Badge>
-                        <Badge variant={asset.deploymentStatus === "deployed" ? "default" : "outline"} className="capitalize">
-                          {formatLabel(asset.deploymentStatus)}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant={asset.status === "shared" ? "default" : "outline"} className="capitalize">
-                          {formatLabel(asset.status)}
-                        </Badge>
-                        {!asset.hasDeployment ? (
-                          <Badge variant="outline">Not deployed</Badge>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="font-semibold">{asset.submissionCount.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground" title={lastSubmissionTitle}>
-                        {asset.submissionCount > 0 ? lastSubmission : "No submissions"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm" title={modifiedTitle}>
-                        {modifiedRelative}
-                      </div>
-                      {asset.dateDeployed ? (
-                        <div className="text-xs text-muted-foreground" title={formatAbsoluteTime(asset.dateDeployed)}>
-                          Deployed {formatRelativeTime(asset.dateDeployed)}
-                        </div>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <div className="space-y-6">
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold">
+                {data.title}
+                {data.spreadsheetUrl ? (
+                  <a
+                    href={data.spreadsheetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:text-primary/80"
+                    aria-label={`Open ${data.title} in Google Sheets`}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                ) : null}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground break-all">
+                Spreadsheet ID: {data.spreadsheetId}
+              </div>
+              {data.timeZone ? (
+                <div className="text-xs text-muted-foreground">Time zone: {data.timeZone}</div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-lg border bg-card/60 p-4">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Last updated</div>
+                <div className="mt-1 text-lg font-semibold">{relativeLastUpdated}</div>
+                <div className="text-xs text-muted-foreground" title={absoluteLastUpdated}>
+                  {absoluteLastUpdated ?? "No timestamp detected"}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-card/60 p-4">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rows analysed</div>
+                <div className="mt-1 text-lg font-semibold">{data.totalRows.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">Excludes header row</div>
+              </div>
+              <div className="rounded-lg border bg-card/60 p-4">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Columns detected</div>
+                <div className="mt-1 text-lg font-semibold">{data.totalColumns.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">Used for analytics mapping</div>
+              </div>
+            </div>
+
+            {headers.length > 0 ? (
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold">Detected columns ({headers.length})</h4>
+                  <span className="text-xs text-muted-foreground">Preview of the first mapped headers</span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {headerPreview.map((header) => (
+                    <Badge key={header} variant="secondary" className="capitalize">
+                      {header}
+                    </Badge>
+                  ))}
+                </div>
+                {headers.length > headerPreview.length ? (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    +{headers.length - headerPreview.length} additional column{headers.length - headerPreview.length === 1 ? "" : "s"}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <Alert className="bg-muted/40">
+                <AlertTitle>No headers found</AlertTitle>
+                <AlertDescription>
+                  The selected range does not contain a header row. Ensure the first row contains column names such as
+                  motivation_score and ability_score.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

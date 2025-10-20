@@ -22,22 +22,155 @@ export type { AnalyticsSubmission as KoboSubmission } from "./analytics";
 const DEFAULT_KOBO_PROXY_DATA_URL = "/api/kobo-data";
 const DEFAULT_KOBO_PROXY_ASSETS_URL = "/api/kobo-assets";
 
-interface RawAsset extends Record<string, unknown> {}
+const DEFAULT_FIELD_MAP = {
+  motivation: "motivation_score",
+  ability: "ability_score",
+  descriptiveNorms: "descriptive_norms",
+  injunctiveNorms: "injunctive_norms",
+  systemReadiness: "system_score",
+  currentUse: "current_use",
+  promptFacilitator: "prompt_facilitator",
+  promptSpark: "prompt_spark",
+  promptSignal: "prompt_signal",
+};
+
+type FieldKey = keyof typeof DEFAULT_FIELD_MAP;
+
+export type QuadrantId =
+  | "high_m_high_a"
+  | "high_m_low_a"
+  | "low_m_high_a"
+  | "low_m_low_a";
+
+export interface KoboSubmission {
+  id: string;
+  motivation: number | null;
+  ability: number | null;
+  descriptiveNorms: number | null;
+  injunctiveNorms: number | null;
+  systemReadiness: number | null;
+  promptFacilitator: number | null;
+  promptSpark: number | null;
+  promptSignal: number | null;
+  currentUse: boolean | null;
+  submissionTime?: string;
+  quadrant?: QuadrantId;
+}
+
+export interface StatWithChange {
+  value: number | null;
+  change: number | null;
+}
+
+export interface CountWithChange {
+  value: number;
+  change: number | null;
+}
+
+export interface QuadrantInsight {
+  id: QuadrantId;
+  label: string;
+  percentage: number;
+  count: number;
+  description: string;
+  color: string;
+  barColor: string;
+  currentUseRate: number | null;
+  avgMotivation: number | null;
+  avgAbility: number | null;
+}
+
+export interface ScatterPoint {
+  id: string;
+  ability: number;
+  motivation: number;
+  currentUse: boolean;
+  norms: number | null;
+  system: number | null;
+}
+
+export interface SegmentSummary {
+  id: QuadrantId;
+  name: string;
+  percentage: number;
+  count: number;
+  color: string;
+  description: string;
+  characteristics: Record<string, number | null>;
+  insights: string[];
+  recommendations: string[];
+  currentUseRate: number | null;
+}
+
+export interface PromptEffectivenessRow {
+  id: QuadrantId;
+  name: string;
+  facilitator: number | null;
+  spark: number | null;
+  signal: number | null;
+}
+
+export type RegressionStrength = "strong" | "moderate" | "weak" | "indirect";
+
+export interface RegressionInsight {
+  variable: string;
+  beta: number | null;
+  pValue: string;
+  strength: RegressionStrength;
+  interpretation: string;
+}
+
+export interface ModelSummary {
+  label: string;
+  value: string;
+  helper: string;
+}
+
+export interface DashboardAnalytics {
+  lastUpdated?: string;
+  stats: {
+    totalRespondents: CountWithChange;
+    currentUsers: CountWithChange;
+    averageMotivation: StatWithChange;
+    averageAbility: StatWithChange;
+  };
+  quadrants: QuadrantInsight[];
+  scatter: ScatterPoint[];
+  segments: SegmentSummary[];
+  promptEffectiveness: PromptEffectivenessRow[];
+  regression: RegressionInsight[];
+  modelSummary: ModelSummary[];
+}
+
+interface FieldMap {
+  motivation: string;
+  ability: string;
+  descriptiveNorms: string;
+  injunctiveNorms: string;
+  systemReadiness: string;
+  currentUse: string;
+  promptFacilitator: string;
+  promptSpark: string;
+  promptSignal: string;
+}
+
+interface RawSubmission extends Record<string, unknown> {
+  _id?: string | number;
+  _uuid?: string;
+  _submission_time?: string;
+  end?: string;
+  start?: string;
+}
 
 export interface KoboAssetSummary {
-  uid: string;
-  name: string;
-  assetType: string;
-  ownerUsername: string | null;
-  status: string;
-  deploymentStatus: string;
-  hasDeployment: boolean;
-  submissionCount: number;
-  dateModified: string | null;
-  dateDeployed: string | null;
-  lastSubmissionTime: string | null;
-  url: string | null;
-  tagString: string | null;
+  spreadsheetId: string;
+  title: string;
+  spreadsheetUrl: string | null;
+  timeZone: string | null;
+  totalRows: number;
+  totalColumns: number;
+  headers: string[];
+  lastUpdated: string | null;
 }
 
 function getKoboProxyUrl(path: "data" | "assets"): string {
@@ -129,65 +262,49 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
   return buildAnalytics(results);
 }
 
-function parseNumber(value: unknown): number | null {
-  if (value == null) return null;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
+function normalizeSheetMetadata(raw: unknown): KoboAssetSummary {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Sheet metadata response was empty.");
   }
-  return null;
-}
 
-function normalizeAsset(raw: RawAsset): KoboAssetSummary | null {
-  const rawUid = raw.uid;
-  let uid: string | null = null;
-  if (typeof rawUid === "string" && rawUid.trim().length > 0) {
-    uid = rawUid;
-  } else if (typeof rawUid === "number") {
-    uid = String(rawUid);
+  const data = raw as Record<string, unknown>;
+  const spreadsheetId =
+    typeof data.spreadsheetId === "string" && data.spreadsheetId.trim().length > 0
+      ? data.spreadsheetId.trim()
+      : null;
+  if (!spreadsheetId) {
+    throw new Error("Sheet metadata is missing a spreadsheetId field.");
   }
-  if (!uid) return null;
 
-  const name = typeof raw.name === "string" && raw.name.trim().length > 0 ? raw.name : "Untitled asset";
-  const assetType = typeof raw.asset_type === "string" && raw.asset_type.length > 0 ? raw.asset_type : "unknown";
-  const ownerUsername = typeof raw.owner__username === "string" ? raw.owner__username : null;
-  const hasDeployment = Boolean(raw.has_deployment);
-
-  const deploymentStatusRaw =
-    typeof raw.deployment_status === "string" && raw.deployment_status.trim().length > 0
-      ? raw.deployment_status
-      : undefined;
-  const statusRaw = typeof raw.status === "string" && raw.status.trim().length > 0 ? raw.status : undefined;
-  const deploymentStatus = deploymentStatusRaw ?? (hasDeployment ? "deployed" : "draft");
-  const status = statusRaw ?? deploymentStatus;
-
-  const submissionCount = parseNumber(raw.deployment__submission_count) ?? 0;
-  const dateModified = typeof raw.date_modified === "string" ? raw.date_modified : null;
-  const dateDeployed = typeof raw.date_deployed === "string" ? raw.date_deployed : null;
-  const lastSubmissionTime =
-    typeof raw.deployment__last_submission_time === "string" ? raw.deployment__last_submission_time : null;
-  const url = typeof raw.url === "string" ? raw.url : null;
-  const tagString = typeof raw.tag_string === "string" && raw.tag_string.trim().length > 0 ? raw.tag_string : null;
+  const title =
+    typeof data.title === "string" && data.title.trim().length > 0 ? data.title.trim() : "Untitled spreadsheet";
+  const spreadsheetUrl =
+    typeof data.spreadsheetUrl === "string" && data.spreadsheetUrl.trim().length > 0
+      ? data.spreadsheetUrl.trim()
+      : null;
+  const timeZone =
+    typeof data.timeZone === "string" && data.timeZone.trim().length > 0 ? data.timeZone.trim() : null;
+  const totalRows = parseNumber(data.totalRows) ?? 0;
+  const totalColumns = parseNumber(data.totalColumns) ?? 0;
+  const headers = Array.isArray(data.headers)
+    ? data.headers.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+  const lastUpdated =
+    typeof data.lastUpdated === "string" && data.lastUpdated.trim().length > 0 ? data.lastUpdated.trim() : null;
 
   return {
-    uid,
-    name,
-    assetType,
-    ownerUsername,
-    status,
-    deploymentStatus,
-    hasDeployment,
-    submissionCount,
-    dateModified,
-    dateDeployed,
-    lastSubmissionTime,
-    url,
-    tagString,
+    spreadsheetId,
+    title,
+    spreadsheetUrl,
+    timeZone,
+    totalRows,
+    totalColumns,
+    headers,
+    lastUpdated,
   };
 }
 
-export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
+export async function fetchKoboAssets(): Promise<KoboAssetSummary> {
   const url = getKoboProxyUrl("assets");
 
   let response: Response;
@@ -201,7 +318,7 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
     const details =
       error instanceof Error && error.message ? error.message : "The network request failed.";
     throw new Error(
-      `Unable to reach the Kobo assets endpoint. Please verify the proxy configuration. (${details})`,
+      `Unable to reach the sheet metadata endpoint. Please verify the proxy configuration. (${details})`,
     );
   }
 
@@ -209,17 +326,9 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
   const rawBody = await response.text();
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Kobo assets (${response.status}): ${summarizeBody(rawBody)}`);
+    throw new Error(`Failed to fetch sheet metadata (${response.status}): ${summarizeBody(rawBody)}`);
   }
 
   const payload = parseJsonResponse(rawBody, contentType, "assets");
-  const results: RawAsset[] = Array.isArray(payload)
-    ? payload
-    : Array.isArray((payload as { results?: unknown[] } | null | undefined)?.results)
-      ? ((payload as { results?: RawAsset[] }).results ?? [])
-      : [];
-
-  return results
-    .map((item) => normalizeAsset(item))
-    .filter((asset): asset is KoboAssetSummary => asset !== null);
+  return normalizeSheetMetadata(payload);
 }

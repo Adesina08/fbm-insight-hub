@@ -4,7 +4,7 @@ import { fetchKoboAssets, type KoboAssetSummary } from "@/lib/kobo";
 export const KOBO_ASSETS_QUERY_KEY = ["kobo", "assets", "list"];
 
 export interface UseKoboAssetsResult {
-  data: KoboAssetSummary[];
+  data: KoboAssetSummary | null;
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -13,7 +13,7 @@ export interface UseKoboAssetsResult {
 }
 
 export const useKoboAssets = (): UseKoboAssetsResult => {
-  const query = useQuery<KoboAssetSummary[], Error>({
+  const query = useQuery<KoboAssetSummary, Error>({
     queryKey: KOBO_ASSETS_QUERY_KEY,
     queryFn: fetchKoboAssets,
     staleTime: 5 * 60_000,
@@ -21,7 +21,7 @@ export const useKoboAssets = (): UseKoboAssetsResult => {
   });
 
   return {
-    data: query.data ?? [],
+    data: query.data ?? null,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error ?? null,
