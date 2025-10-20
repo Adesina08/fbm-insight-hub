@@ -1,12 +1,9 @@
 import { useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, BarChart3, Users, Target, Activity, FileText, Zap, Network } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BarChart3, Users, Target, Activity, Zap, Network } from "lucide-react";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
-import UploadSection from "@/components/dashboard/UploadSection";
-import QuestionnaireReference from "@/components/dashboard/QuestionnaireReference";
 import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivenessHeatmap";
 import PathDiagram from "@/components/dashboard/PathDiagram";
 import { useSheetsAnalytics } from "@/hooks/useSheetsAnalytics";
@@ -26,23 +23,19 @@ const Index = () => {
       {/* Header */}
       <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-6 py-5 max-w-7xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-chart-3 to-secondary flex items-center justify-center shadow-lg">
-                  <Activity className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
-                    BEHAV360
-                  </h1>
-                  <p className="text-sm text-muted-foreground font-medium">Survey Analytics Dashboard</p>
-                  <p className="text-xs text-muted-foreground mt-1">{syncStatus}</p>
-                </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-chart-3 to-secondary flex items-center justify-center shadow-lg">
+                <Activity className="w-7 h-7 text-white" />
               </div>
-              <Button className="gap-2 bg-gradient-to-r from-primary to-chart-3 hover:opacity-90 shadow-md">
-                <Upload className="w-4 h-4" />
-                Upload Data
-            </Button>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
+                  BEHAV360
+                </h1>
+                <p className="text-sm text-muted-foreground font-medium">Survey Analytics Dashboard</p>
+                <p className="text-xs text-muted-foreground mt-1">{syncStatus}</p>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -50,7 +43,7 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-6 py-10 max-w-7xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in">
-          <TabsList className="grid w-full max-w-6xl grid-cols-7 mx-auto h-auto p-1.5 bg-card/50 backdrop-blur-sm shadow-md">
+          <TabsList className="grid w-full max-w-6xl grid-cols-5 mx-auto h-auto p-1.5 bg-card/50 backdrop-blur-sm shadow-md">
             <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
               <BarChart3 className="w-4 h-4" />
               <span className="hidden sm:inline font-medium">Overview</span>
@@ -70,14 +63,6 @@ const Index = () => {
             <TabsTrigger value="regression" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
               <Network className="w-4 h-4" />
               <span className="hidden sm:inline font-medium">Model</span>
-            </TabsTrigger>
-            <TabsTrigger value="questionnaire" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
-              <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline font-medium">Reference</span>
-            </TabsTrigger>
-            <TabsTrigger value="upload" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
-              <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline font-medium">Upload</span>
             </TabsTrigger>
           </TabsList>
 
@@ -123,14 +108,6 @@ const Index = () => {
               isLoading={isLoading}
               error={isError ? error?.message ?? "" : null}
             />
-          </TabsContent>
-
-          <TabsContent value="questionnaire" className="space-y-6 mt-8">
-            <QuestionnaireReference />
-          </TabsContent>
-
-          <TabsContent value="upload" className="space-y-6 mt-8">
-            <UploadSection />
           </TabsContent>
         </Tabs>
       </main>
