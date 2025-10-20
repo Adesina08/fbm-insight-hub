@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { LucideIcon } from "lucide-react";
 import { ArrowUpRight, ArrowDownRight, Users, TrendingUp, Activity, Target, RefreshCcw } from "lucide-react";
 import type { DashboardAnalytics, QuadrantInsight } from "@/lib/googleSheets";
 
@@ -101,13 +102,21 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
     return <ErrorState message="No Google Sheet rows are available yet." onRetry={onRetry} />;
   }
 
-  const cards = [
+  const cards: Array<{
+    title: string;
+    value: string;
+    change: ReturnType<typeof formatChange>;
+    trendIcon: LucideIcon;
+    suffix: string;
+    gradient: string;
+  }> = [
     {
       title: "Total Respondents",
       value: formatNumber(stats.totalRespondents.value),
       change: formatChange(stats.totalRespondents.change),
       trendIcon: Users,
       suffix: "",
+      gradient: "from-chart-1 to-chart-1/60",
     },
     {
       title: "Contraceptive Users",
@@ -115,6 +124,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       change: formatChange(stats.currentUsers.change, " pp"),
       trendIcon: Target,
       suffix: "",
+      gradient: "from-chart-2 to-chart-2/60",
     },
     {
       title: "Avg Motivation Score",
@@ -125,6 +135,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       change: formatChange(stats.averageMotivation.change, ""),
       trendIcon: TrendingUp,
       suffix: " / 5",
+      gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/60",
     },
     {
       title: "Avg Ability Score",
@@ -135,6 +146,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
       change: formatChange(stats.averageAbility.change, ""),
       trendIcon: Activity,
       suffix: " / 5",
+      gradient: "from-chart-4 to-chart-4/60",
     },
   ];
 
