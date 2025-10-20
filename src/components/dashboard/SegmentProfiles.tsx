@@ -23,6 +23,69 @@ const METRICS = ["Motivation", "Ability", "Norms", "System"] as const;
 
 type MetricLabel = (typeof METRICS)[number];
 
+const FALLBACK_COLOR = "#6366f1";
+
+const clamp = (value: number, min: number, max: number) => {
+  return Math.min(Math.max(value, min), max);
+};
+
+const normalizeHex = (hex: string) => {
+  if (!hex) {
+    return null;
+  }
+  const normalized = hex.replace("#", "");
+  if (normalized.length === 3) {
+    return normalized
+      .split("")
+      .map((char) => char + char)
+      .join("");
+  }
+  if (normalized.length === 6) {
+    return normalized;
+  }
+  return null;
+};
+
+const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+  const normalized = normalizeHex(hex);
+  if (!normalized) {
+    return null;
+  }
+  const value = Number.parseInt(normalized, 16);
+  if (Number.isNaN(value)) {
+    return null;
+  }
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+};
+
+const mixColor = (hex: string, amount: number) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) {
+    return amount >= 0 ? "rgb(147, 197, 253)" : "rgb(79, 70, 229)";
+  }
+  const factor = clamp(Math.abs(amount), 0, 1);
+  const target = amount >= 0 ? 255 : 0;
+  const mixComponent = (component: number) =>
+    Math.round(component + (target - component) * factor);
+  return `rgb(${mixComponent(rgb.r)}, ${mixComponent(rgb.g)}, ${mixComponent(rgb.b)})`;
+};
+
+const lightenColor = (hex: string, amount: number) => mixColor(hex, Math.abs(amount));
+
+const darkenColor = (hex: string, amount: number) => mixColor(hex, -Math.abs(amount));
+
+const withOpacity = (hex: string, alpha: number) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) {
+    return `rgba(99, 102, 241, ${alpha})`;
+  }
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+};
+
 const average = (values: Array<number | null | undefined>): number | null => {
   const valid = values.filter((value): value is number => value != null && Number.isFinite(value));
   if (valid.length === 0) {
@@ -55,9 +118,9 @@ const polarToCartesian = (angle: number, value: number, radius: number, center: 
 };
 
 const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
-  const size = 240;
+  const size = 280;
   const center = size / 2;
-  const radius = size / 2 - 28;
+  const radius = size / 2 - 32;
   const angleStep = 360 / METRICS.length;
 
   const normsAverage = average([
@@ -72,10 +135,33 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
     System: segment.characteristics.systemReadiness,
   };
 
-  const strokeColor = SEGMENT_COLORS[segment.id] ?? "#6366f1";
+  const strokeColor = SEGMENT_COLORS[segment.id] ?? FALLBACK_COLOR;
   const gradientId = `radar-fill-${segment.id}`;
   const glowId = `radar-glow-${segment.id}`;
   const backgroundId = `radar-background-${segment.id}`;
+  const outlineGradientId = `radar-outline-${segment.id}`;
+  const vertexGradientId = `radar-vertex-${segment.id}`;
+  const panelGradientId = `radar-panel-${segment.id}`;
+  const haloFilterId = `radar-halo-${segment.id}`;
+  const gridGradientId = `radar-grid-${segment.id}`;
+  const axisGradientPrefix = `radar-axis-${segment.id}`;
+
+  const accentSoft = withOpacity(strokeColor, 0.16);
+  const accentLighter = lightenColor(strokeColor, 0.35);
+  const accentLight = lightenColor(strokeColor, 0.2);
+  const accentDark = darkenColor(strokeColor, 0.2);
+  const accentDeeper = darkenColor(strokeColor, 0.35);
+
+  const axisDefinitions = METRICS.map((_, index) => {
+    const { x, y } = polarToCartesian(index * angleStep, 5.2, radius, center);
+    return {
+      id: `${axisGradientPrefix}-${index}`,
+      x1: center,
+      y1: center,
+      x2: x,
+      y2: y,
+    };
+  });
 
   const points = METRICS.map((metric, index) => {
     const value = metricValues[metric] ?? 0;
@@ -88,30 +174,90 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
-      className="w-full"
+      className="w-full max-w-[320px] drop-shadow-sm"
       role="img"
       aria-label={`${segment.name} radar chart`}
     >
       <defs>
+        <linearGradient id={panelGradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={withOpacity(strokeColor, 0.18)} />
+          <stop offset="60%" stopColor={withOpacity(strokeColor, 0.08)} />
+          <stop offset="100%" stopColor="transparent" />
+        </linearGradient>
         <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.32" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.14" />
+          <stop offset="0%" stopColor={accentLighter} stopOpacity="0.65" />
+          <stop offset="65%" stopColor={strokeColor} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.08" />
         </linearGradient>
         <radialGradient id={backgroundId} cx="50%" cy="50%" r="75%">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.08" />
-          <stop offset="60%" stopColor={strokeColor} stopOpacity="0.04" />
+          <stop offset="0%" stopColor={withOpacity(strokeColor, 0.32)} />
+          <stop offset="45%" stopColor={accentSoft} />
+          <stop offset="100%" stopColor="transparent" />
+        </radialGradient>
+        <linearGradient id={outlineGradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={accentLighter} />
+          <stop offset="100%" stopColor={accentDeeper} />
+        </linearGradient>
+        <linearGradient id={gridGradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={accentLight} stopOpacity="0.55" />
+          <stop offset="100%" stopColor={accentDark} stopOpacity="0.2" />
+        </linearGradient>
+        <radialGradient id={vertexGradientId} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={withOpacity(strokeColor, 0.9)} />
+          <stop offset="55%" stopColor={withOpacity(strokeColor, 0.28)} />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
         <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+          <feDropShadow dx="0" dy="12" stdDeviation="10" floodColor={withOpacity(strokeColor, 0.2)} />
+          <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        <filter id={haloFilterId} x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="18" />
+        </filter>
+        {axisDefinitions.map((axis) => (
+          <linearGradient
+            key={axis.id}
+            id={axis.id}
+            gradientUnits="userSpaceOnUse"
+            x1={axis.x1}
+            y1={axis.y1}
+            x2={axis.x2}
+            y2={axis.y2}
+          >
+            <stop offset="0%" stopColor={withOpacity(strokeColor, 0.05)} />
+            <stop offset="75%" stopColor={withOpacity(strokeColor, 0.18)} />
+            <stop offset="100%" stopColor={withOpacity(strokeColor, 0.35)} />
+          </linearGradient>
+        ))}
       </defs>
+      <rect width={size} height={size} fill={`url(#${panelGradientId})`} opacity={0.85} />
+      <g filter={`url(#${haloFilterId})`} opacity={0.55}>
+        <circle cx={center} cy={center} r={radius * 0.82} fill={accentSoft} />
+      </g>
       <circle cx={center} cy={center} r={radius} fill={`url(#${backgroundId})`} />
-      <circle cx={center} cy={center} r={radius} fill="var(--card)" opacity="0.45" />
+      <circle
+        cx={center}
+        cy={center}
+        r={radius}
+        fill="var(--card)"
+        opacity="0.35"
+        stroke={withOpacity(strokeColor, 0.18)}
+        strokeWidth={1.2}
+      />
+      <circle
+        cx={center}
+        cy={center}
+        r={radius * 0.92}
+        fill="none"
+        stroke={`url(#${gridGradientId})`}
+        strokeDasharray="14 12"
+        strokeWidth={1.1}
+        opacity={0.5}
+      />
       {gridRadii.map((gridValue) => (
         <circle
           key={gridValue}
@@ -119,15 +265,15 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
           cy={center}
           r={(gridValue / 5) * radius}
           fill="none"
-          stroke="var(--muted)"
-          strokeDasharray="6 6"
-          strokeWidth={0.7}
-          opacity={0.7}
+          stroke={`url(#${gridGradientId})`}
+          strokeDasharray={gridValue % 2 === 0 ? "4 6" : "8 10"}
+          strokeWidth={gridValue === 5 ? 1.2 : 0.7}
+          opacity={gridValue === 5 ? 0.75 : 0.45}
         />
       ))}
       {METRICS.map((metric, index) => {
         const axis = polarToCartesian(index * angleStep, 5, radius, center);
-        const label = polarToCartesian(index * angleStep, 5.4, radius, center);
+        const label = polarToCartesian(index * angleStep, 5.65, radius, center);
         return (
           <g key={metric}>
             <line
@@ -135,9 +281,9 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
               y1={center}
               x2={axis.x}
               y2={axis.y}
-              stroke="var(--muted-foreground)"
-              strokeWidth={1}
-              strokeOpacity={0.4}
+              stroke={`url(#${axisGradientPrefix}-${index})`}
+              strokeWidth={1.2}
+              strokeLinecap="round"
             />
             <text
               x={label.x}
@@ -146,11 +292,12 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
               textAnchor="middle"
               fontSize="12"
               fontWeight={600}
+              letterSpacing={0.4}
               fill="var(--foreground)"
               style={{ paintOrder: "stroke fill" }}
               stroke="var(--card)"
-              strokeWidth={3}
-              opacity={0.85}
+              strokeWidth={4}
+              opacity={0.9}
             >
               {metric}
             </text>
@@ -160,13 +307,20 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
       <polygon
         points={points}
         fill={`url(#${gradientId})`}
-        stroke={strokeColor}
-        strokeWidth={3}
+        stroke={`url(#${outlineGradientId})`}
+        strokeWidth={2.8}
         strokeLinejoin="round"
         filter={`url(#${glowId})`}
-        opacity={0.95}
+        opacity={0.98}
       />
-      <circle cx={center} cy={center} r={6} fill={strokeColor} opacity={0.8} />
+      <circle
+        cx={center}
+        cy={center}
+        r={12}
+        fill={withOpacity(strokeColor, 0.25)}
+        filter={`url(#${haloFilterId})`}
+      />
+      <circle cx={center} cy={center} r={7} fill={strokeColor} opacity={0.85} stroke={accentLighter} strokeWidth={1.2} />
       <text
         x={center}
         y={center + 4}
@@ -176,8 +330,8 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
         fill="var(--foreground)"
         style={{ paintOrder: "stroke fill" }}
         stroke="var(--card)"
-        strokeWidth={4}
-        opacity={0.9}
+        strokeWidth={5}
+        opacity={0.92}
       >
         {segment.name}
       </text>
@@ -194,7 +348,7 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
             textAnchor="middle"
             fontSize={10}
             fill="var(--muted-foreground)"
-            opacity={0.6}
+            opacity={0.55}
           >
             {gridValue}
           </text>
@@ -206,13 +360,14 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
         const { x, y } = polarToCartesian(index * angleStep, value, radius, center);
         const labelPosition = polarToCartesian(
           index * angleStep,
-          Math.min(value + 0.5, 5.6),
+          Math.min(value + 0.6, 5.75),
           radius,
           center,
         );
         return (
           <g key={metric}>
-            <circle cx={x} cy={y} r={5} fill={strokeColor} stroke="#fff" strokeWidth={1.5} />
+            <circle cx={x} cy={y} r={9} fill={`url(#${vertexGradientId})`} />
+            <circle cx={x} cy={y} r={4.5} fill={strokeColor} stroke={accentLight} strokeWidth={1.5} />
             {rawValue != null ? (
               <text
                 x={labelPosition.x}
@@ -302,20 +457,8 @@ const SegmentProfiles = ({ segments, isLoading = false, error }: SegmentProfiles
               const insights = segment.insights ?? [];
               const recommendations = segment.recommendations ?? [];
 
-              const withAlpha = (hex: string, alpha: number) => {
-                const normalized = hex.replace("#", "");
-                const bigint = parseInt(normalized, 16);
-                if (Number.isNaN(bigint)) {
-                  return `rgba(99, 102, 241, ${alpha})`;
-                }
-                const r = (bigint >> 16) & 255;
-                const g = (bigint >> 8) & 255;
-                const b = bigint & 255;
-                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-              };
-
-              const accentSurface = withAlpha(accent, 0.12);
-              const accentBorder = withAlpha(accent, 0.35);
+              const accentSurface = withOpacity(accent, 0.12);
+              const accentBorder = withOpacity(accent, 0.35);
 
               return (
                 <div
