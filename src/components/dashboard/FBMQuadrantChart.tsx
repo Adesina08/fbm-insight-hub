@@ -112,7 +112,7 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
           </div>
         </CardHeader>
         <CardContent>
-          <div className="w-full">
+          <div className="w-full h-[520px] md:h-[580px]">
             <Plot
               data={[
                 {
@@ -164,7 +164,7 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
               ]}
               layout={{
                 width: undefined,
-                height: 600,
+                height: undefined,
                 autosize: true,
                 paper_bgcolor: "rgba(0,0,0,0)",
                 plot_bgcolor: "rgba(0,0,0,0)",
@@ -236,9 +236,11 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
                   x: 1,
                   font: { family: "inherit" },
                 },
-                margin: { l: 40, r: 20, t: 20, b: 40 },
+                margin: { l: 60, r: 40, t: 40, b: 60 },
               }}
-              config={{ displayModeBar: false }}
+              config={{ displayModeBar: false, responsive: true }}
+              useResizeHandler
+              style={{ width: "100%", height: "100%" }}
             />
           </div>
         </CardContent>

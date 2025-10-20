@@ -1,9 +1,6 @@
-import Plot from "react-plotly.js";
-import { Users, Lightbulb, ArrowRight } from "lucide-react";
+import { Users } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SegmentSummary } from "@/lib/googleSheets";
 
@@ -13,15 +10,36 @@ interface SegmentProfilesProps {
   error?: string | null;
 }
 
-const formatMetric = (value: number | null | undefined) => {
-  if (value == null || Number.isNaN(value)) return "n/a";
-  return value.toFixed(2);
+type SegmentProfile = {
+  name: string;
+  color: string;
+  values: Record<string, number>;
 };
 
-const formatPercentage = (value: number | null | undefined) => {
-  if (value == null || Number.isNaN(value)) return "n/a";
-  return `${value.toFixed(1)}%`;
-};
+const METRICS = ["Motivation", "Ability", "Norms", "System"] as const;
+
+const SEGMENT_PROFILES: SegmentProfile[] = [
+  {
+    name: "Empowered Adopters",
+    color: "#22c55e",
+    values: { Motivation: 4.5, Ability: 4.0, Norms: 4.2, System: 3.8 },
+  },
+  {
+    name: "Willing but Hindered",
+    color: "#f59e0b",
+    values: { Motivation: 3.0, Ability: 2.2, Norms: 3.5, System: 1.8 },
+  },
+  {
+    name: "Passive Resisters",
+    color: "#3b82f6",
+    values: { Motivation: 2.2, Ability: 2.8, Norms: 2.0, System: 2.5 },
+  },
+  {
+    name: "Isolated Non-Users",
+    color: "#ef4444",
+    values: { Motivation: 1.5, Ability: 1.8, Norms: 1.6, System: 1.2 },
+  },
+];
 
 const LoadingState = () => (
   <div className="space-y-4">
@@ -30,13 +48,70 @@ const LoadingState = () => (
   </div>
 );
 
-const EmptyState = () => (
-  <div className="p-6 text-sm text-muted-foreground bg-muted/20 rounded-lg">
-    Segments will appear once Google Sheet rows include both motivation and ability scores.
-  </div>
-);
+const polarToCartesian = (angle: number, value: number, radius: number, center: number) => {
+  const radians = ((angle - 90) * Math.PI) / 180;
+  const scaled = (value / 5) * radius;
+  return {
+    x: center + scaled * Math.cos(radians),
+    y: center + scaled * Math.sin(radians),
+  };
+};
 
-const SegmentProfiles = ({ segments, isLoading = false, error }: SegmentProfilesProps) => {
+const RadarChart = ({ profile }: { profile: SegmentProfile }) => {
+  const size = 240;
+  const center = size / 2;
+  const radius = size / 2 - 24;
+  const angleStep = 360 / METRICS.length;
+
+  const points = METRICS.map((metric, index) => {
+    const { x, y } = polarToCartesian(index * angleStep, profile.values[metric], radius, center);
+    return `${x},${y}`;
+  }).join(" ");
+
+  const gridRadii = [1, 2, 3, 4, 5];
+
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} className="w-full" role="img" aria-label={`${profile.name} radar chart`}>
+      <defs>
+        <linearGradient id={`radar-fill-${profile.name.replace(/\s+/g, "-")}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={profile.color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={profile.color} stopOpacity="0.15" />
+        </linearGradient>
+      </defs>
+      <circle cx={center} cy={center} r={radius} fill="var(--card)" opacity="0.25" />
+      {gridRadii.map((gridValue) => (
+        <circle
+          key={gridValue}
+          cx={center}
+          cy={center}
+          r={(gridValue / 5) * radius}
+          fill="none"
+          stroke="var(--muted)"
+          strokeDasharray="4 4"
+          strokeWidth={0.8}
+        />
+      ))}
+      {METRICS.map((metric, index) => {
+        const { x, y } = polarToCartesian(index * angleStep, 5, radius, center);
+        return (
+          <g key={metric}>
+            <line x1={center} y1={center} x2={x} y2={y} stroke="var(--muted)" strokeWidth={1} />
+            <text x={x} y={y} dy={8} textAnchor="middle" fontSize="12" fill="var(--muted-foreground)">
+              {metric}
+            </text>
+          </g>
+        );
+      })}
+      <polygon points={points} fill={`url(#radar-fill-${profile.name.replace(/\s+/g, "-")})`} stroke={profile.color} strokeWidth={3} />
+      {METRICS.map((metric, index) => {
+        const { x, y } = polarToCartesian(index * angleStep, profile.values[metric], radius, center);
+        return <circle key={metric} cx={x} cy={y} r={5} fill={profile.color} stroke="#fff" strokeWidth={1.5} />;
+      })}
+    </svg>
+  );
+};
+
+const SegmentProfiles = ({ isLoading = false, error }: SegmentProfilesProps) => {
   if (isLoading) {
     return (
       <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
@@ -61,31 +136,6 @@ const SegmentProfiles = ({ segments, isLoading = false, error }: SegmentProfiles
     );
   }
 
-  if (!segments || segments.every((segment) => segment.count === 0)) {
-    return (
-      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
-              <Users className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl">Behavioral Segments</CardTitle>
-              <CardDescription className="text-base mt-1">
-                Distinct groups based on clustering analysis of FBM components, norms, and system factors
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <EmptyState />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const orderedSegments = [...segments].sort((a, b) => b.count - a.count);
-
   return (
     <div className="space-y-6 animate-fade-in">
       <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
@@ -97,143 +147,26 @@ const SegmentProfiles = ({ segments, isLoading = false, error }: SegmentProfiles
             <div>
               <CardTitle className="text-2xl">Behavioral Segments</CardTitle>
               <CardDescription className="text-base mt-1">
-                Distinct groups based on clustering analysis of FBM components, norms, and system factors
+                Radar charts replicating the provided segment profiles, including the system dimension
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Tabs defaultValue={orderedSegments[0]?.id ?? ""} className="w-full">
-            <TabsList className="grid w-full grid-cols-1 gap-2 p-1.5 bg-muted/50 md:grid-cols-4">
-              {orderedSegments.map((segment) => (
-                <TabsTrigger
-                  key={segment.id}
-                  value={segment.id}
-                  className="text-sm py-3 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md font-medium"
-                >
-                  {segment.name.split(" ")[0]}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {orderedSegments.map((segment) => {
-              const dimensions = Object.keys(segment.characteristics);
-              const values = Object.values(segment.characteristics).map((value) => value ?? 0);
-
-              return (
-                <TabsContent key={segment.id} value={segment.id} className="space-y-6 mt-6">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-3">
-                      <h3 className="text-3xl font-bold flex items-center gap-3 mb-2">
-                        {segment.name}
-                        <Badge className={`bg-${segment.color} text-white text-base px-3 py-1`}>
-                          {formatPercentage(segment.percentage)}
-                        </Badge>
-                      </h3>
-                      <p className="text-sm text-muted-foreground font-medium">
-                        {segment.count} respondents · Current use rate {formatPercentage(segment.currentUseRate == null ? null : segment.currentUseRate * 100)}
-                      </p>
-                      <p className="text-base text-foreground max-w-3xl leading-relaxed">
-                        {segment.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-8 md:grid-cols-2">
-                    <div>
-                      <Plot
-                        data={[{
-                          type: "scatterpolar",
-                          r: values,
-                          theta: dimensions.map((dimension) =>
-                            dimension
-                              .replace(/([A-Z])/g, " $1")
-                              .trim()
-                              .split(" ")
-                              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                              .join(" ")
-                          ),
-                          fill: "toself",
-                          fillcolor: `var(--${segment.color})`,
-                          opacity: 0.3,
-                          line: {
-                            color: `var(--${segment.color})`,
-                            width: 3,
-                          },
-                          marker: {
-                            size: 8,
-                            color: `var(--${segment.color})`,
-                          },
-                        }]}
-                        layout={{
-                          polar: {
-                            radialaxis: { visible: true, range: [0, 5], tickfont: { family: "inherit" } },
-                            angularaxis: { tickfont: { family: "inherit" } },
-                          },
-                          autosize: true,
-                          margin: { t: 20, b: 20, l: 20, r: 20 },
-                          paper_bgcolor: "rgba(0,0,0,0)",
-                          plot_bgcolor: "rgba(0,0,0,0)",
-                          font: { family: "inherit" },
-                        }}
-                        config={{ displayModeBar: false }}
-                      />
-                    </div>
-
-                    <div className="space-y-5">
-                      <Card className="bg-muted/40 border-muted/40">
-                        <CardHeader className="pb-3 flex flex-row items-center gap-3">
-                          <Lightbulb className="w-5 h-5 text-primary" />
-                          <CardTitle className="text-base">Segment Insights</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 text-sm text-muted-foreground">
-                          {segment.insights.map((insight, index) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
-                              <span>{insight}</span>
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-
-                      <Card className="bg-muted/40 border-muted/40">
-                        <CardHeader className="pb-3 flex flex-row items-center gap-3">
-                          <ArrowRight className="w-5 h-5 text-primary" />
-                          <CardTitle className="text-base">Priority Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 text-sm text-muted-foreground">
-                          {segment.recommendations.map((recommendation, index) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
-                              <span>{recommendation}</span>
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {dimensions.map((dimension) => (
-                      <Card key={dimension} className="bg-muted/40 border-muted/40">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-xs text-muted-foreground">
-                            {dimension.replace(/([A-Z])/g, " $1").trim()}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-foreground">
-                            {formatMetric(segment.characteristics[dimension])}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">1-5 scale</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-              );
-            })}
-          </Tabs>
+        <CardContent className="space-y-8">
+          <div className="grid gap-8 md:grid-cols-2">
+            {SEGMENT_PROFILES.map((profile) => (
+              <div key={profile.name} className="space-y-4">
+                <h3 className="text-lg font-semibold text-center text-foreground">{profile.name}</h3>
+                <div className="rounded-2xl border bg-background/70 p-4 shadow-inner">
+                  <RadarChart profile={profile} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            These static profiles mirror the attached reference, offering a quick comparison of motivation, ability, norms, and
+            system readiness across all four behavioural segments.
+          </p>
         </CardContent>
       </Card>
     </div>

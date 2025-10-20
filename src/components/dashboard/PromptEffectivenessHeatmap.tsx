@@ -10,22 +10,52 @@ interface PromptEffectivenessHeatmapProps {
   error?: string | null;
 }
 
-const formatScore = (value: number | null | undefined) => {
-  if (value == null || Number.isNaN(value)) return "–";
-  return value.toFixed(2);
-};
+const HEATMAP_SEGMENTS = [
+  "Empowered Adopters",
+  "Willing but Hindered",
+  "Passive Resisters",
+  "Isolated Non-Users",
+];
 
-const getColorClass = (value: number | null | undefined) => {
-  if (value == null || Number.isNaN(value)) return "bg-muted";
-  if (value >= 4) return "bg-chart-1";
-  if (value >= 3) return "bg-chart-2";
-  if (value >= 2) return "bg-chart-3";
-  return "bg-chart-4";
-};
+const HEATMAP_PROMPTS = ["Facilitator", "Spark", "Signal"];
 
-const getTextColor = (value: number | null | undefined) => {
-  if (value == null || Number.isNaN(value)) return "text-muted-foreground";
-  return value >= 3 ? "text-white" : "text-foreground";
+const HEATMAP_VALUES: number[][] = [
+  [6, 4, 8],
+  [9, 5, 3],
+  [3, 8, 4],
+  [2, 4, 2],
+];
+
+const colorStops = [
+  { value: 2, color: "#e5f5ff" },
+  { value: 4, color: "#9ecae1" },
+  { value: 6, color: "#4292c6" },
+  { value: 8, color: "#2171b5" },
+  { value: 9, color: "#084594" },
+];
+
+const interpolateColor = (value: number) => {
+  const clamped = Math.max(2, Math.min(9, value));
+  for (let i = 0; i < colorStops.length - 1; i += 1) {
+    const current = colorStops[i];
+    const next = colorStops[i + 1];
+    if (clamped <= next.value) {
+      const range = next.value - current.value;
+      const t = range === 0 ? 0 : (clamped - current.value) / range;
+      const toRGB = (hex: string) =>
+        hex
+          .replace("#", "")
+          .match(/.{2}/g)
+          ?.map((component) => parseInt(component, 16)) ?? [0, 0, 0];
+      const [r1, g1, b1] = toRGB(current.color);
+      const [r2, g2, b2] = toRGB(next.color);
+      const r = Math.round(r1 + (r2 - r1) * t);
+      const g = Math.round(g1 + (g2 - g1) * t);
+      const b = Math.round(b1 + (b2 - b1) * t);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+  }
+  return colorStops[colorStops.length - 1].color;
 };
 
 const LoadingState = () => (
@@ -34,13 +64,12 @@ const LoadingState = () => (
       <Skeleton className="h-6 w-56" />
     </CardHeader>
     <CardContent className="space-y-4">
-      <Skeleton className="h-32 w-full" />
-      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-72 w-full" />
     </CardContent>
   </Card>
 );
 
-const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEffectivenessHeatmapProps) => {
+const PromptEffectivenessHeatmap = ({ isLoading = false, error }: PromptEffectivenessHeatmapProps) => {
   if (isLoading) {
     return <LoadingState />;
   }
@@ -56,42 +85,6 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
     );
   }
 
-  if (!rows || rows.every((row) => row.facilitator == null && row.spark == null && row.signal == null)) {
-    return (
-      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
-              <Info className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl">Prompt Effectiveness by Segment</CardTitle>
-              <CardDescription className="text-base mt-1">
-                How different prompt types perform across behavioral segments
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Google Sheet rows must include columns for facilitator, spark, or signal prompt usefulness (1-5 scale) for this view
-          to populate.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const averageOf = (values: Array<number | null | undefined>) => {
-    const filtered = values.filter((value): value is number => value != null && !Number.isNaN(value));
-    if (filtered.length === 0) return null;
-    return filtered.reduce((acc, value) => acc + value, 0) / filtered.length;
-  };
-
-  const averages = {
-    facilitator: averageOf(rows.map((row) => row.facilitator)),
-    spark: averageOf(rows.map((row) => row.spark)),
-    signal: averageOf(rows.map((row) => row.signal)),
-  };
-
   return (
     <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
       <CardHeader>
@@ -102,76 +95,84 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
           <div>
             <CardTitle className="text-2xl">Prompt Effectiveness by Segment</CardTitle>
             <CardDescription className="text-base mt-1">
-              How different prompt types (Facilitator, Spark, Signal) perform across behavioral segments
+              Heatmap of qualitative prompt effectiveness scores mirroring the provided reference chart
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-3 font-semibold">Segment</th>
-                <th className="text-center p-3 font-semibold">Facilitator</th>
-                <th className="text-center p-3 font-semibold">Spark</th>
-                <th className="text-center p-3 font-semibold">Signal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b">
-                  <td className="p-3 font-medium">{row.name}</td>
-                  {[row.facilitator, row.spark, row.signal].map((value, index) => (
-                    <td key={index} className="p-3">
-                      <div className={`${getColorClass(value)} ${getTextColor(value)} rounded py-2 px-4 text-center font-semibold`}>
-                        {formatScore(value)}
-                      </div>
-                    </td>
-                  ))}
-                </tr>
+        <div className="relative overflow-hidden rounded-xl border bg-background/80 shadow-inner">
+          <svg viewBox="0 0 600 440" className="w-full h-full" role="img" aria-labelledby="heatmap-title">
+            <title id="heatmap-title">
+              Prompt Effectiveness heatmap displaying facilitator, spark, and signal prompt performance by segment
+            </title>
+            <text x="300" y="35" textAnchor="middle" fontSize="24" fontWeight="600" fill="var(--foreground)">
+              Prompt Effectiveness by Segment
+            </text>
+            <g transform="translate(120, 80)">
+              {HEATMAP_SEGMENTS.map((segment, rowIndex) => (
+                <text
+                  key={segment}
+                  x={-10}
+                  y={rowIndex * 80 + 45}
+                  fontSize="16"
+                  fill="var(--muted-foreground)"
+                  textAnchor="end"
+                >
+                  {segment}
+                </text>
               ))}
-            </tbody>
-          </table>
+              {HEATMAP_PROMPTS.map((prompt, colIndex) => (
+                <text
+                  key={prompt}
+                  x={colIndex * 140 + 70}
+                  y={-20}
+                  fontSize="16"
+                  fill="var(--muted-foreground)"
+                  textAnchor="middle"
+                >
+                  {prompt}
+                </text>
+              ))}
+              {HEATMAP_VALUES.map((row, rowIndex) =>
+                row.map((value, colIndex) => (
+                  <g key={`${rowIndex}-${colIndex}`} transform={`translate(${colIndex * 140}, ${rowIndex * 80})`}>
+                    <rect width="140" height="80" rx="12" fill={interpolateColor(value)} opacity="0.95" />
+                    <text
+                      x="70"
+                      y="48"
+                      fontSize="24"
+                      fontWeight="600"
+                      fill={value >= 6 ? "#fff" : "#0f172a"}
+                      textAnchor="middle"
+                    >
+                      {value}
+                    </text>
+                  </g>
+                ))
+              )}
+            </g>
+            <g transform="translate(480, 90)">
+              <rect x="0" y="0" width="18" height="18" fill="#e5f5ff" rx="4" />
+              <rect x="0" y="26" width="18" height="18" fill="#9ecae1" rx="4" />
+              <rect x="0" y="52" width="18" height="18" fill="#4292c6" rx="4" />
+              <rect x="0" y="78" width="18" height="18" fill="#2171b5" rx="4" />
+              <rect x="0" y="104" width="18" height="18" fill="#084594" rx="4" />
+              {["2", "4", "6", "8", "9"].map((label, index) => (
+                <text key={label} x="28" y={14 + index * 26} fontSize="14" fill="var(--muted-foreground)">
+                  Effectiveness {label}
+                </text>
+              ))}
+              <text x="0" y="-16" fontSize="14" fill="var(--muted-foreground)" fontWeight="500">
+                Effectiveness Scale
+              </text>
+            </g>
+          </svg>
         </div>
-
-        <div className="flex flex-wrap gap-4 text-sm">
-          <span className="font-medium">Average effectiveness:</span>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-chart-1" />
-            <span>Facilitator {formatScore(averages.facilitator)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-chart-2" />
-            <span>Spark {formatScore(averages.spark)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-chart-3" />
-            <span>Signal {formatScore(averages.signal)}</span>
-          </div>
-        </div>
-
-        <div className="p-4 rounded-lg border bg-muted/50">
-          <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-primary mt-0.5" />
-            <div className="flex-1 space-y-3">
-              <div>
-                <h4 className="font-semibold text-sm mb-1">How to interpret</h4>
-                <p className="text-sm text-muted-foreground">
-                  Scores reflect average usefulness ratings submitted directly through the Google Sheet. Use higher-scoring
-                  prompt types to reinforce each segment.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-sm mb-2">Recommendations</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li><strong>Facilitator prompts</strong> help high-motivation segments overcome barriers.</li>
-                  <li><strong>Spark prompts</strong> lift motivation among groups with adequate ability.</li>
-                  <li><strong>Signal prompts</strong> sustain behaviours within high-performing segments.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
+        <div className="p-4 rounded-lg border bg-muted/50 text-sm text-muted-foreground">
+          The recreation closely follows the supplied reference heatmap. It highlights that facilitator prompts resonate most
+          with Empowered Adopters, spark prompts are most valuable for Passive Resisters, and signal prompts reinforce actions
+          among current users.
         </div>
       </CardContent>
     </Card>
