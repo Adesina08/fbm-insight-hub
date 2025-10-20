@@ -14,6 +14,119 @@ export type FieldKey = keyof typeof DEFAULT_FIELD_MAP;
 
 export type FieldMap = Record<FieldKey, string>;
 
+type NormalizedRecord = Map<string, unknown>;
+
+function normalizeKeyName(key: string | undefined): string {
+  if (!key) return "";
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function buildNormalizedRecord(source: RawSubmission): NormalizedRecord {
+  const normalized = new Map<string, unknown>();
+
+  Object.entries(source).forEach(([rawKey, value]) => {
+    if (typeof rawKey !== "string") {
+      return;
+    }
+
+    const key = normalizeKeyName(rawKey);
+    if (!key || normalized.has(key)) {
+      return;
+    }
+
+    normalized.set(key, value);
+  });
+
+  return normalized;
+}
+
+function findMatchingKey(record: NormalizedRecord, tokens: readonly string[]): string | undefined {
+  const normalizedTokens = tokens
+    .map((token) => normalizeKeyName(token))
+    .filter((token) => token.length > 0);
+
+  if (normalizedTokens.length === 0) {
+    return undefined;
+  }
+
+  for (const key of record.keys()) {
+    const keyTokens = key.split("_").filter(Boolean);
+    if (normalizedTokens.every((token) => keyTokens.includes(token))) {
+      return key;
+    }
+  }
+
+  return undefined;
+}
+
+function lookupFieldValue(record: NormalizedRecord, field: FieldKey, fieldMap: FieldMap): unknown {
+  const primaryKey = normalizeKeyName(fieldMap[field]);
+
+  if (primaryKey && record.has(primaryKey)) {
+    return record.get(primaryKey);
+  }
+
+  const hints = FIELD_TOKEN_HINTS[field] ?? [];
+  for (const tokens of hints) {
+    const match = findMatchingKey(record, tokens);
+    if (match && record.has(match)) {
+      return record.get(match);
+    }
+  }
+
+  return undefined;
+}
+
+const FIELD_TOKEN_HINTS: Record<FieldKey, string[][]> = {
+  motivation: [
+    ["motivation", "score"],
+    ["motivation"],
+  ],
+  ability: [
+    ["ability", "score"],
+    ["ability"],
+  ],
+  descriptiveNorms: [
+    ["descriptive", "norm"],
+    ["descriptive"],
+  ],
+  injunctiveNorms: [
+    ["injunctive", "norm"],
+    ["injunctive"],
+  ],
+  systemReadiness: [
+    ["system", "readiness"],
+    ["service", "readiness"],
+    ["system", "score"],
+    ["service", "score"],
+  ],
+  currentUse: [
+    ["current", "use"],
+    ["current", "user"],
+    ["currently", "using"],
+    ["current"],
+  ],
+  promptFacilitator: [
+    ["prompt", "facilitator"],
+    ["facilitator", "prompt"],
+    ["facilitator"],
+  ],
+  promptSpark: [
+    ["prompt", "spark"],
+    ["spark", "prompt"],
+    ["spark"],
+  ],
+  promptSignal: [
+    ["prompt", "signal"],
+    ["signal", "prompt"],
+    ["signal"],
+  ],
+} as const;
+
 export type QuadrantId =
   | "high_m_high_a"
   | "high_m_low_a"
@@ -220,15 +333,17 @@ export function normalizeSubmissions(
   fieldMap: FieldMap = resolveFieldMap(),
 ): AnalyticsSubmission[] {
   return raw.map((item) => {
-    const motivation = parseNumber(item[fieldMap.motivation]);
-    const ability = parseNumber(item[fieldMap.ability]);
-    const descriptiveNorms = parseNumber(item[fieldMap.descriptiveNorms]);
-    const injunctiveNorms = parseNumber(item[fieldMap.injunctiveNorms]);
-    const systemReadiness = parseNumber(item[fieldMap.systemReadiness]);
-    const currentUse = parseBoolean(item[fieldMap.currentUse]);
-    const promptFacilitator = parseNumber(item[fieldMap.promptFacilitator]);
-    const promptSpark = parseNumber(item[fieldMap.promptSpark]);
-    const promptSignal = parseNumber(item[fieldMap.promptSignal]);
+    const normalizedRecord = buildNormalizedRecord(item);
+
+    const motivation = parseNumber(lookupFieldValue(normalizedRecord, "motivation", fieldMap));
+    const ability = parseNumber(lookupFieldValue(normalizedRecord, "ability", fieldMap));
+    const descriptiveNorms = parseNumber(lookupFieldValue(normalizedRecord, "descriptiveNorms", fieldMap));
+    const injunctiveNorms = parseNumber(lookupFieldValue(normalizedRecord, "injunctiveNorms", fieldMap));
+    const systemReadiness = parseNumber(lookupFieldValue(normalizedRecord, "systemReadiness", fieldMap));
+    const currentUse = parseBoolean(lookupFieldValue(normalizedRecord, "currentUse", fieldMap));
+    const promptFacilitator = parseNumber(lookupFieldValue(normalizedRecord, "promptFacilitator", fieldMap));
+    const promptSpark = parseNumber(lookupFieldValue(normalizedRecord, "promptSpark", fieldMap));
+    const promptSignal = parseNumber(lookupFieldValue(normalizedRecord, "promptSignal", fieldMap));
 
     const submissionTime = toISODate(
       typeof item._submission_time === "string"
