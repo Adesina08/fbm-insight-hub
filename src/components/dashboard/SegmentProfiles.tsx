@@ -55,9 +55,9 @@ const polarToCartesian = (angle: number, value: number, radius: number, center: 
 };
 
 const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
-  const size = 220;
+  const size = 240;
   const center = size / 2;
-  const radius = size / 2 - 24;
+  const radius = size / 2 - 28;
   const angleStep = 360 / METRICS.length;
 
   const normsAverage = average([
@@ -73,6 +73,9 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
   };
 
   const strokeColor = SEGMENT_COLORS[segment.id] ?? "#6366f1";
+  const gradientId = `radar-fill-${segment.id}`;
+  const glowId = `radar-glow-${segment.id}`;
+  const backgroundId = `radar-background-${segment.id}`;
 
   const points = METRICS.map((metric, index) => {
     const value = metricValues[metric] ?? 0;
@@ -83,14 +86,32 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
   const gridRadii = [1, 2, 3, 4, 5];
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full" role="img" aria-label={`${segment.name} radar chart`}>
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      className="w-full"
+      role="img"
+      aria-label={`${segment.name} radar chart`}
+    >
       <defs>
-        <linearGradient id={`radar-fill-${segment.id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.15" />
+        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.32" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0.14" />
         </linearGradient>
+        <radialGradient id={backgroundId} cx="50%" cy="50%" r="75%">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.08" />
+          <stop offset="60%" stopColor={strokeColor} stopOpacity="0.04" />
+          <stop offset="100%" stopColor="transparent" />
+        </radialGradient>
+        <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
-      <circle cx={center} cy={center} r={radius} fill="var(--card)" opacity="0.25" />
+      <circle cx={center} cy={center} r={radius} fill={`url(#${backgroundId})`} />
+      <circle cx={center} cy={center} r={radius} fill="var(--card)" opacity="0.45" />
       {gridRadii.map((gridValue) => (
         <circle
           key={gridValue}
@@ -99,26 +120,116 @@ const RadarChart = ({ segment }: { segment: SegmentSummary }) => {
           r={(gridValue / 5) * radius}
           fill="none"
           stroke="var(--muted)"
-          strokeDasharray="4 4"
-          strokeWidth={0.8}
+          strokeDasharray="6 6"
+          strokeWidth={0.7}
+          opacity={0.7}
         />
       ))}
       {METRICS.map((metric, index) => {
-        const { x, y } = polarToCartesian(index * angleStep, 5, radius, center);
+        const axis = polarToCartesian(index * angleStep, 5, radius, center);
+        const label = polarToCartesian(index * angleStep, 5.4, radius, center);
         return (
           <g key={metric}>
-            <line x1={center} y1={center} x2={x} y2={y} stroke="var(--muted)" strokeWidth={1} />
-            <text x={x} y={y} dy={8} textAnchor="middle" fontSize="12" fill="var(--muted-foreground)">
+            <line
+              x1={center}
+              y1={center}
+              x2={axis.x}
+              y2={axis.y}
+              stroke="var(--muted-foreground)"
+              strokeWidth={1}
+              strokeOpacity={0.4}
+            />
+            <text
+              x={label.x}
+              y={label.y}
+              dy={6}
+              textAnchor="middle"
+              fontSize="12"
+              fontWeight={600}
+              fill="var(--foreground)"
+              style={{ paintOrder: "stroke fill" }}
+              stroke="var(--card)"
+              strokeWidth={3}
+              opacity={0.85}
+            >
               {metric}
             </text>
           </g>
         );
       })}
-      <polygon points={points} fill={`url(#radar-fill-${segment.id})`} stroke={strokeColor} strokeWidth={3} />
+      <polygon
+        points={points}
+        fill={`url(#${gradientId})`}
+        stroke={strokeColor}
+        strokeWidth={3}
+        strokeLinejoin="round"
+        filter={`url(#${glowId})`}
+        opacity={0.95}
+      />
+      <circle cx={center} cy={center} r={6} fill={strokeColor} opacity={0.8} />
+      <text
+        x={center}
+        y={center + 4}
+        textAnchor="middle"
+        fontSize={13}
+        fontWeight={600}
+        fill="var(--foreground)"
+        style={{ paintOrder: "stroke fill" }}
+        stroke="var(--card)"
+        strokeWidth={4}
+        opacity={0.9}
+      >
+        {segment.name}
+      </text>
+      {gridRadii.map((gridValue) => {
+        if (gridValue === 5) {
+          return null;
+        }
+        const marker = polarToCartesian(-90, gridValue, radius, center);
+        return (
+          <text
+            key={`grid-${gridValue}`}
+            x={marker.x}
+            y={marker.y - 4}
+            textAnchor="middle"
+            fontSize={10}
+            fill="var(--muted-foreground)"
+            opacity={0.6}
+          >
+            {gridValue}
+          </text>
+        );
+      })}
       {METRICS.map((metric, index) => {
-        const value = metricValues[metric] ?? 0;
+        const rawValue = metricValues[metric];
+        const value = rawValue ?? 0;
         const { x, y } = polarToCartesian(index * angleStep, value, radius, center);
-        return <circle key={metric} cx={x} cy={y} r={5} fill={strokeColor} stroke="#fff" strokeWidth={1.5} />;
+        const labelPosition = polarToCartesian(
+          index * angleStep,
+          Math.min(value + 0.5, 5.6),
+          radius,
+          center,
+        );
+        return (
+          <g key={metric}>
+            <circle cx={x} cy={y} r={5} fill={strokeColor} stroke="#fff" strokeWidth={1.5} />
+            {rawValue != null ? (
+              <text
+                x={labelPosition.x}
+                y={labelPosition.y + 4}
+                textAnchor="middle"
+                fontSize={11}
+                fontWeight={600}
+                fill={strokeColor}
+                style={{ paintOrder: "stroke fill" }}
+                stroke="var(--card)"
+                strokeWidth={4}
+              >
+                {formatMetric(rawValue)}
+              </text>
+            ) : null}
+          </g>
+        );
       })}
     </svg>
   );
