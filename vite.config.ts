@@ -15,8 +15,9 @@ export default defineConfig(({ mode }) => {
     plugins.push({
       name: "api-middleware",
       configureServer(server) {
-        const sheetsData = require("./api/sheets-data").default;
-        const sheetsMeta = require("./api/sheets-metadata").default;
+        // Include the .ts extension so Node/Vite can resolve the TypeScript modules.
+        const sheetsData = require("./api/sheets-data.ts").default;
+        const sheetsMeta = require("./api/sheets-metadata.ts").default;
 
         server.middlewares.use(async (req, res, next) => {
           const url = req.url?.split("?")[0] ?? "";
