@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchKoboAnalytics, type DashboardAnalytics } from "@/lib/kobo";
+import { fetchSheetsAnalytics, type DashboardAnalytics } from "@/lib/googleSheets";
 
-export const KOBO_QUERY_KEY = ["kobo", "analytics"];
+export const SHEETS_QUERY_KEY = ["google-sheets", "analytics"];
 
 export const REFRESH_INTERVAL_MS = 60_000;
 
-export interface UseKoboDataResult {
+export interface UseSheetsDataResult {
   data: DashboardAnalytics | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -14,10 +14,10 @@ export interface UseKoboDataResult {
   isFetching: boolean;
 }
 
-export const useKoboData = (): UseKoboDataResult => {
+export const useSheetsData = (): UseSheetsDataResult => {
   const query = useQuery<DashboardAnalytics, Error>({
-    queryKey: KOBO_QUERY_KEY,
-    queryFn: fetchKoboAnalytics,
+    queryKey: SHEETS_QUERY_KEY,
+    queryFn: fetchSheetsAnalytics,
     refetchInterval: REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: true,
     staleTime: REFRESH_INTERVAL_MS / 2,

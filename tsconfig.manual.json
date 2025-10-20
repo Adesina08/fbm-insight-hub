@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2022",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "outDir": "./tmp/manual"
+  },
+  "include": [
+    "scripts/processSampleData.ts",
+    "src/lib/googleSheets.ts"
+  ]
+}

@@ -2,121 +2,68 @@ import { defineConfig } from "vite";
 import type { PluginOption } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "fs/promises";
+import type { ServerResponse } from "http";
 import { componentTagger } from "lovable-tagger";
 
-const DEFAULT_KOBO_BASE_URL = "https://kf.kobotoolbox.org";
+const SAMPLE_DATA_PATH = path.resolve(__dirname, "fixtures/sample-sheets-data.json");
 
-type KoboProxyTarget = "data" | "assets";
-
-function setCors(res: import("http").ServerResponse): void {
+function setCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
 }
 
-function buildKoboTarget(baseUrl: string, assetId: string, target: KoboProxyTarget): string {
-  if (target === "data") {
-    return `${baseUrl}/api/v2/assets/${assetId}/data/?format=json`;
-  }
-
-  const params = new URLSearchParams({
-    format: "json",
-    metadata: "on",
-    ordering: "-date_modified",
-    collections_first: "true",
-  });
-  return `${baseUrl}/api/v2/assets/?${params.toString()}`;
-}
-
-function createProxyHandler(
-  baseUrl: string,
-  assetId: string,
-  token: string,
-  resolveTarget: (path: string) => KoboProxyTarget | null,
-): import("connect").NextHandleFunction {
-  return async (req, res, next) => {
-    if (!req.url) {
-      next();
-      return;
-    }
-
-    const method = req.method?.toUpperCase() ?? "GET";
-    if (method === "OPTIONS") {
-      res.statusCode = 204;
-      setCors(res);
-      res.end();
-      return;
-    }
-
-    if (method !== "GET") {
-      next();
-      return;
-    }
-
-    const normalizedPath = req.url.startsWith("/") ? req.url : `/${req.url}`;
-    const targetKey = resolveTarget(normalizedPath);
-
-    if (!targetKey) {
-      next();
-      return;
-    }
-
-    const targetUrl = buildKoboTarget(baseUrl, assetId, targetKey);
-
-    try {
-      const response = await fetch(targetUrl, {
-        headers: {
-          Authorization: `Token ${token}`,
-          Accept: "application/json",
-        },
-      });
-
-      res.statusCode = response.status;
-      setCors(res);
-      res.setHeader("Content-Type", response.headers.get("content-type") ?? "application/json");
-      const body = await response.text();
-      res.end(body);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to contact Kobo.";
-      res.statusCode = 502;
-      setCors(res);
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: message }));
-    }
-  };
-}
-
-function createKoboDevProxyPlugin(): PluginOption {
+function createSheetsDevProxyPlugin(): PluginOption {
   return {
-    name: "kobo-dev-proxy",
-    configureServer(server) {
-      const assetId = process.env.KOBO_ASSET_ID;
-      const token = process.env.KOBO_TOKEN;
+    name: "sheets-dev-proxy",
+    async configureServer(server) {
+      let samplePayload: string | null = null;
 
-      if (!assetId || !token) {
+      try {
+        samplePayload = await fs.readFile(SAMPLE_DATA_PATH, "utf8");
+      } catch (error) {
         console.warn(
-          "[kobo-dev-proxy] KOBO_ASSET_ID or KOBO_TOKEN is not set. Kobo requests will be skipped in development.",
+          "[sheets-dev-proxy] Unable to load fixtures/sample-sheets-data.json. Requests will return an error until a Google Sheets backend is configured.",
+          error instanceof Error ? error.message : error,
         );
-        return;
       }
 
-      const baseUrl = (process.env.KOBO_BASE_URL ?? DEFAULT_KOBO_BASE_URL).replace(/\/$/, "");
+      server.middlewares.use("/api/sheets-data", async (req, res, next) => {
+        if (!req.url) {
+          next();
+          return;
+        }
 
-      const fixedDataHandler = createProxyHandler(baseUrl, assetId, token, () => "data");
-      const fixedAssetsHandler = createProxyHandler(baseUrl, assetId, token, () => "assets");
-      const legacyHandler = createProxyHandler(baseUrl, assetId, token, (path) => {
-        if (path === "/data" || path.startsWith("/data?")) {
-          return "data";
+        const method = req.method?.toUpperCase() ?? "GET";
+
+        if (method === "OPTIONS") {
+          res.statusCode = 204;
+          setCors(res);
+          res.end();
+          return;
         }
-        if (path === "/assets" || path.startsWith("/assets")) {
-          return "assets";
+
+        if (method !== "GET") {
+          next();
+          return;
         }
-        return null;
+
+        if (!samplePayload) {
+          res.statusCode = 502;
+          setCors(res);
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({ error: "Google Sheets dev proxy is not configured and no sample data is available." }),
+          );
+          return;
+        }
+
+        res.statusCode = 200;
+        setCors(res);
+        res.setHeader("Content-Type", "application/json");
+        res.end(samplePayload);
       });
-
-      server.middlewares.use("/api/kobo-data", fixedDataHandler);
-      server.middlewares.use("/api/kobo-assets", fixedAssetsHandler);
-      server.middlewares.use("/api/kobo", legacyHandler);
     },
   };
 }
@@ -127,7 +74,7 @@ export default defineConfig(({ mode }) => {
 
   if (mode === "development") {
     plugins.push(componentTagger());
-    plugins.push(createKoboDevProxyPlugin());
+    plugins.push(createSheetsDevProxyPlugin());
   }
 
   return {

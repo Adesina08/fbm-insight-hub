@@ -1,0 +1,69 @@
+{
+  "results": [
+    {
+      "_uuid": "row-1",
+      "motivation_score": "4",
+      "ability_score": "3",
+      "descriptive_norms": "4",
+      "injunctive_norms": "3",
+      "system_score": "4",
+      "current_use": "yes",
+      "prompt_facilitator": "4",
+      "prompt_spark": "5",
+      "prompt_signal": "4",
+      "_submission_time": "2024-01-10T08:15:00Z"
+    },
+    {
+      "_uuid": "row-2",
+      "motivation_score": "2",
+      "ability_score": "2",
+      "descriptive_norms": "3",
+      "injunctive_norms": "2",
+      "system_score": "2",
+      "current_use": "no",
+      "prompt_facilitator": "2",
+      "prompt_spark": "2",
+      "prompt_signal": "1",
+      "_submission_time": "2024-01-11T09:30:00Z"
+    },
+    {
+      "_uuid": "row-3",
+      "motivation_score": "5",
+      "ability_score": "4",
+      "descriptive_norms": "5",
+      "injunctive_norms": "4",
+      "system_score": "5",
+      "current_use": "yes",
+      "prompt_facilitator": "4",
+      "prompt_spark": "4",
+      "prompt_signal": "5",
+      "_submission_time": "2024-01-12T11:45:00Z"
+    },
+    {
+      "_uuid": "row-4",
+      "motivation_score": "3",
+      "ability_score": "1",
+      "descriptive_norms": "2",
+      "injunctive_norms": "3",
+      "system_score": "2",
+      "current_use": "no",
+      "prompt_facilitator": "3",
+      "prompt_spark": "2",
+      "prompt_signal": "2",
+      "_submission_time": "2024-01-13T14:20:00Z"
+    },
+    {
+      "_uuid": "row-5",
+      "motivation_score": "4",
+      "ability_score": "5",
+      "descriptive_norms": "4",
+      "injunctive_norms": "5",
+      "system_score": "4",
+      "current_use": "yes",
+      "prompt_facilitator": "5",
+      "prompt_spark": "4",
+      "prompt_signal": "4",
+      "_submission_time": "2024-01-14T16:05:00Z"
+    }
+  ]
+}

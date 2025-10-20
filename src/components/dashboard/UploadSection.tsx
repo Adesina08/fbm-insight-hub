@@ -4,8 +4,6 @@ import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from "lucide-react
 import { useState } from "react";
 import { toast } from "sonner";
 
-import KoboAssetList from "./KoboAssetList";
-
 const UploadSection = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -204,7 +202,6 @@ const UploadSection = () => {
           </div>
         </CardContent>
       </Card>
-      <KoboAssetList />
     </div>
   );
 };
