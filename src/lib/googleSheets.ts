@@ -31,6 +31,20 @@ export type {
 const DEFAULT_SHEETS_DATA_URL = "/api/sheets-data";
 const DEFAULT_SHEETS_METADATA_URL = "/api/sheets-metadata";
 
+function getBaseAwarePath(path: string): string {
+  const rawBase = (import.meta.env.BASE_URL ?? "/").trim();
+  const normalizedBase = rawBase === "/"
+    ? ""
+    : rawBase.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (!normalizedBase) {
+    return normalizedPath;
+  }
+
+  return `${normalizedBase}${normalizedPath}`;
+}
+
 interface SheetsDataResponse {
   count?: unknown;
   results?: unknown;
@@ -74,7 +88,8 @@ function getSheetsEndpoint(path: "data" | "metadata"): string {
     return `${normalizedBase}${normalizedPath}`;
   }
 
-  return path === "data" ? DEFAULT_SHEETS_DATA_URL : DEFAULT_SHEETS_METADATA_URL;
+  const defaultPath = path === "data" ? DEFAULT_SHEETS_DATA_URL : DEFAULT_SHEETS_METADATA_URL;
+  return getBaseAwarePath(defaultPath);
 }
 
 function summarizeBody(body: string, limit = 120): string {
