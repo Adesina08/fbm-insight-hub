@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "http";
 
 import {
-  fetchFromKobo,
-  getKoboAssetId,
+  fetchFromSheets,
+  getSheetsDataUrl,
   handleOptionsRequest,
-  relayKoboResponse,
+  relaySheetsResponse,
   sendError,
-} from "./_lib/kobo";
+} from "./_lib/sheets";
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (handleOptionsRequest(req, res)) {
@@ -18,21 +18,24 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  let assetId: string;
+  let dataUrl: string;
   try {
-    assetId = getKoboAssetId();
+    dataUrl = getSheetsDataUrl();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Missing Kobo configuration.";
+    const message =
+      error instanceof Error ? error.message : "Missing Google Sheets configuration. Set SHEETS_DATA_URL or related env vars.";
     sendError(res, 500, message);
     return;
   }
 
   try {
-    const response = await fetchFromKobo(`/api/v2/assets/${assetId}/data/?format=json`);
-    await relayKoboResponse(res, response);
+    const response = await fetchFromSheets(dataUrl);
+    await relaySheetsResponse(res, response);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to contact Kobo. Please try again later.";
+      error instanceof Error
+        ? error.message
+        : "Failed to contact Google Sheets. Please try again later.";
     sendError(res, 502, message);
   }
 }

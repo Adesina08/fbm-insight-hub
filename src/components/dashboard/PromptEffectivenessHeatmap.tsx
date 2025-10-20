@@ -2,7 +2,7 @@ import { Info } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PromptEffectivenessRow } from "@/lib/kobo";
+import type { PromptEffectivenessRow } from "@/lib/sheets";
 
 interface PromptEffectivenessHeatmapProps {
   rows?: PromptEffectivenessRow[];
@@ -73,8 +73,7 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
           </div>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Kobo submissions must include fields for facilitator, spark, or signal prompt usefulness (1-5 scale) for this view to
-          populate.
+          Google Sheets submissions must include columns for facilitator, spark, or signal prompt usefulness (1-5 scale) for this view to populate.
         </CardContent>
       </Card>
     );
@@ -158,8 +157,8 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
               <div>
                 <h4 className="font-semibold text-sm mb-1">How to interpret</h4>
                 <p className="text-sm text-muted-foreground">
-                  Scores reflect average usefulness ratings submitted directly through Kobo. Use higher-scoring prompt types to
-                  reinforce each segment.
+                  Scores reflect average usefulness ratings synced from Google Sheets. Use higher-scoring prompt types to reinfo
+rce each segment.
                 </p>
               </div>
               <div>

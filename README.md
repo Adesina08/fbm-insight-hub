@@ -60,42 +60,30 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## Connecting to KoboCollect
+## Connecting to Google Sheets
 
-The dashboard now reads live data directly from KoboCollect/KoboToolbox and refreshes automatically when new submissions arrive. To enable the integration:
+The dashboard now reads live data from Google Sheets (or a compatible proxy) and refreshes automatically when new rows are synced. To enable the integration:
 
 1. Copy `.env.example` to `.env` and populate the **server-side** values (do **not** prefix them with `VITE_`):
-   - `KOBO_ASSET_ID` – the UID of your Kobo form (e.g. `a1b2cd34ef56gh7ijk890l`).
-   - `KOBO_TOKEN` – a Kobo API token with access to the form's submissions.
-   - (Optional) `KOBO_BASE_URL` if you use the EU Kobo deployment or a self-hosted instance.
-   - (Optional) override the frontend field mappings (`VITE_KOBO_FIELD_*`) if your survey question names differ from the defaults.
-   - (Optional) set `VITE_KOBO_PROXY_BASE_URL` if your deployment exposes the API proxy behind a shared base path (legacy `/api/kobo` style routes).
-   - (Optional) override `VITE_KOBO_PROXY_DATA_URL` and/or `VITE_KOBO_PROXY_ASSETS_URL` when your hosting platform rewrites the API routes to custom endpoints.
-2. Restart `npm run dev` so Vite picks up the environment variables. During local development, the Vite dev server serves both `/api/kobo-data` and `/api/kobo-assets` (plus the legacy `/api/kobo/*` paths) using the values above. In production, deploy the bundled `api/kobo-*.ts` functions (e.g. on Vercel/Netlify) so the browser never talks to Kobo directly.
+   - Provide either `SHEETS_DATA_URL`/`SHEETS_METADATA_URL` that point to JSON endpoints, **or** set `SHEETS_BASE_URL` plus `SHEETS_SPREADSHEET_ID` so the proxy can compose Google Sheets API calls automatically.
+   - (Optional) define `SHEETS_WORKSHEET_NAME` when targeting a specific tab instead of the default first sheet.
+   - (Optional) configure authentication helpers such as `SHEETS_API_KEY`, `SHEETS_BEARER_TOKEN`, or `SHEETS_BASIC_USER`/`SHEETS_BASIC_PASSWORD` if your proxy requires them.
+   - (Optional) override the frontend field mappings (`VITE_SHEETS_FIELD_*`) if your sheet column names differ from the defaults.
+   - (Optional) set `VITE_SHEETS_PROXY_BASE_URL`, `VITE_SHEETS_PROXY_DATA_URL`, or `VITE_SHEETS_PROXY_ASSETS_URL` when your hosting platform rewrites the API routes to custom endpoints.
+2. Restart `npm run dev` so Vite picks up the environment variables. During local development, the Vite dev server serves `/api/sheets-data` and `/api/sheets-metadata` using the values above. In production, deploy the bundled `api/sheets-*.ts` functions (e.g. on Vercel/Netlify) so the browser never talks to Sheets directly.
 
-The frontend polls Kobo every 60 seconds to keep charts and metrics up to date. If the connection fails, each widget shows contextual error messaging with a retry option.
+The frontend polls Google Sheets every 60 seconds to keep charts and metrics up to date. If the connection fails, each widget shows contextual error messaging with a retry option.
 
-### Troubleshooting Kobo 404 errors
+### Troubleshooting Google Sheets responses
 
-If Kobo returns a `404`, the API endpoint exists but the specific asset cannot be found. Use the checklist below to isolate the mismatch quickly:
+If the proxy returns an error (e.g. `401`, `403`, or `404`), work through the checklist below:
 
-1. **Verify the three coordinates** – the base URL (`https://kf.kobotoolbox.org` for the Global server or `https://eu.kobotoolbox.org` for the EU server), the asset UID (taken from the project URL: `/assets/<UID>/`), and the API token must all belong to the same Kobo account and server region.
-2. **Run a quick `curl` sanity check** outside the app. Both of the requests below should return `200`; replace the placeholders with your values:
+1. **Verify credentials** – confirm the configured service account or API key has read access to the spreadsheet.
+2. **Double-check the spreadsheet ID and worksheet name** – copy them directly from the Google Sheets URL to avoid typos.
+3. **Inspect the resolved request URL** by hitting the proxy with `curl` or logging outbound requests. Ensure the base URL, spreadsheet ID, and any ranges match the sheet you expect.
+4. **Review sharing settings** – spreadsheets must be shared with the service account email or published to the web when using an API key only.
 
-   ```bash
-   curl -sS -H "Authorization: Token <KOBO_TOKEN>" \
-        "https://<kf-or-eu>.kobotoolbox.org/api/v2/assets/<ASSET_UID>/?format=json" -i
-
-   curl -sS -H "Authorization: Token <KOBO_TOKEN>" \
-        "https://<kf-or-eu>.kobotoolbox.org/api/v2/assets/<ASSET_UID>/data/?format=json" -i
-   ```
-
-   A `404` response indicates a wrong server, UID, or permissions for the token, not a frontend issue.
-3. **Confirm the exact path** in your fetch call. The Kobo v2 submissions endpoint requires `/api/v2/assets/<ASSET_UID>/data/` with the trailing slash before any query string.
-4. **Log the resolved request URL** in your app or API proxy when debugging. Check that the base URL, UID, trailing slash, and token all match the known-good values from the curl test. For server-side proxies, log Kobo's upstream response when the status is not `200` so you can see the precise error message.
-5. **Revisit common causes** – wrong server (`kf` vs `eu`), incorrect UID (using a numeric ID instead of the asset UID), missing trailing slash, token/account mismatch, or mixing v1 and v2 API routes.
-
-Once both curl checks succeed, the frontend should also resolve the asset without returning a `404`.
+Once the proxy returns `200 OK` for both data and metadata endpoints, the dashboard will ingest rows and refresh automatically.
 
 ## How can I deploy this project?
 

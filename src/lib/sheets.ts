@@ -1,5 +1,5 @@
-const DEFAULT_KOBO_PROXY_DATA_URL = "/api/kobo-data";
-const DEFAULT_KOBO_PROXY_ASSETS_URL = "/api/kobo-assets";
+const DEFAULT_SHEETS_PROXY_DATA_URL = "/api/sheets-data";
+const DEFAULT_SHEETS_PROXY_ASSETS_URL = "/api/sheets-assets";
 
 const DEFAULT_FIELD_MAP = {
   motivation: "motivation_score",
@@ -21,7 +21,7 @@ export type QuadrantId =
   | "low_m_high_a"
   | "low_m_low_a";
 
-export interface KoboSubmission {
+export interface SheetsSubmission {
   id: string;
   motivation: number | null;
   ability: number | null;
@@ -143,7 +143,7 @@ interface RawSubmission extends Record<string, unknown> {
 
 interface RawAsset extends Record<string, unknown> {}
 
-export interface KoboAssetSummary {
+export interface SheetsAssetSummary {
   uid: string;
   name: string;
   assetType: string;
@@ -227,7 +227,7 @@ function getFieldMap(): FieldMap {
   const envVars = import.meta.env as Record<string, string | undefined>;
 
   (Object.keys(map) as FieldKey[]).forEach((key) => {
-    const envKey = `VITE_KOBO_FIELD_${key.toUpperCase()}`;
+    const envKey = `VITE_SHEETS_FIELD_${key.toUpperCase()}`;
     const override = envVars?.[envKey];
     if (override && typeof override === "string" && override.trim().length > 0) {
       map[key] = override.trim();
@@ -237,23 +237,23 @@ function getFieldMap(): FieldMap {
   return map as FieldMap;
 }
 
-function getKoboProxyUrl(path: "data" | "assets"): string {
+function getSheetsProxyUrl(path: "data" | "assets"): string {
   const env = import.meta.env as Record<string, string | undefined> | undefined;
 
   const specificOverride =
-    path === "data" ? env?.VITE_KOBO_PROXY_DATA_URL : env?.VITE_KOBO_PROXY_ASSETS_URL;
+    path === "data" ? env?.VITE_SHEETS_PROXY_DATA_URL : env?.VITE_SHEETS_PROXY_ASSETS_URL;
   if (specificOverride && specificOverride.trim().length > 0) {
     return specificOverride.trim();
   }
 
-  const baseOverride = env?.VITE_KOBO_PROXY_BASE_URL;
+  const baseOverride = env?.VITE_SHEETS_PROXY_BASE_URL;
   if (baseOverride && baseOverride.trim().length > 0) {
     const normalizedBase = baseOverride.trim().replace(/\/$/, "");
     const normalizedPath = path === "data" ? "/data" : "/assets";
     return `${normalizedBase}${normalizedPath}`;
   }
 
-  return path === "data" ? DEFAULT_KOBO_PROXY_DATA_URL : DEFAULT_KOBO_PROXY_ASSETS_URL;
+  return path === "data" ? DEFAULT_SHEETS_PROXY_DATA_URL : DEFAULT_SHEETS_PROXY_ASSETS_URL;
 }
 
 function parseNumber(value: unknown): number | null {
@@ -318,11 +318,11 @@ function difference(newValue: number | null, oldValue: number | null): number | 
 }
 
 interface PeriodSplit {
-  earlier: KoboSubmission[];
-  recent: KoboSubmission[];
+  earlier: SheetsSubmission[];
+  recent: SheetsSubmission[];
 }
 
-function splitPeriods(submissions: KoboSubmission[]): PeriodSplit {
+function splitPeriods(submissions: SheetsSubmission[]): PeriodSplit {
   const dated = submissions
     .filter((submission) => submission.submissionTime)
     .sort((a, b) => {
@@ -348,22 +348,22 @@ function submissionTimeToNumber(value?: string): number {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
-function computeCurrentUseRate(submissions: KoboSubmission[]): number | null {
+function computeCurrentUseRate(submissions: SheetsSubmission[]): number | null {
   const withFlag = submissions.filter((item) => item.currentUse != null);
   if (withFlag.length === 0) return null;
   const count = withFlag.filter((item) => item.currentUse === true).length;
   return count / withFlag.length;
 }
 
-function averageFor(submissions: KoboSubmission[], selector: (submission: KoboSubmission) => number | null): number | null {
+function averageFor(submissions: SheetsSubmission[], selector: (submission: SheetsSubmission) => number | null): number | null {
   return average(submissions.map(selector));
 }
 
-function computePromptAverage(submissions: KoboSubmission[], selector: (submission: KoboSubmission) => number | null): number | null {
+function computePromptAverage(submissions: SheetsSubmission[], selector: (submission: SheetsSubmission) => number | null): number | null {
   return average(submissions.map(selector));
 }
 
-function computePromptReceptivity(submission: KoboSubmission): number | null {
+function computePromptReceptivity(submission: SheetsSubmission): number | null {
   return average([
     submission.promptFacilitator,
     submission.promptSpark,
@@ -405,7 +405,7 @@ function interpretDifference(label: string, beta: number | null, userAverage: nu
   return `${label} shows no difference between current users and non-users.`;
 }
 
-function computeModelSummary(submissions: KoboSubmission[], quadrants: QuadrantInsight[]): ModelSummary[] {
+function computeModelSummary(submissions: SheetsSubmission[], quadrants: QuadrantInsight[]): ModelSummary[] {
   const total = submissions.length;
   const currentUseRate = computeCurrentUseRate(submissions);
   const avgNorms = average(submissions.map((item) => item.descriptiveNorms));
@@ -438,7 +438,7 @@ function computeModelSummary(submissions: KoboSubmission[], quadrants: QuadrantI
   ];
 }
 
-export function normalizeSubmissions(raw: RawSubmission[]): KoboSubmission[] {
+export function normalizeSubmissions(raw: RawSubmission[]): SheetsSubmission[] {
   const fieldMap = getFieldMap();
 
   return raw.map((item) => {
@@ -466,7 +466,7 @@ export function normalizeSubmissions(raw: RawSubmission[]): KoboSubmission[] {
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2);
 
-    const normalized: KoboSubmission = {
+    const normalized: SheetsSubmission = {
       id: String(item._id ?? item._uuid ?? generatedId),
       motivation,
       ability,
@@ -498,7 +498,7 @@ export function buildAnalytics(raw: RawSubmission[]): DashboardAnalytics {
   const currentUsers = submissions.filter((submission) => submission.currentUse === true);
   const nonUsers = submissions.filter((submission) => submission.currentUse === false);
 
-  const quadrantGroups: Record<QuadrantId, KoboSubmission[]> = {
+  const quadrantGroups: Record<QuadrantId, SheetsSubmission[]> = {
     high_m_high_a: [],
     high_m_low_a: [],
     low_m_high_a: [],
@@ -678,11 +678,11 @@ function parseJsonResponse(rawBody: string, contentType: string, context: string
   if (!isJson) {
     const preview = summarizeBody(rawBody);
     const hint = preview.startsWith("import ")
-      ? " The response looks like a Vite module. When running the dev server, ensure KOBO_ASSET_ID and KOBO_TOKEN are set so the Kobo proxy can return JSON."
+      ? " The response looks like a Vite module. When running the dev server, ensure SHEETS_DATA_URL/SHEETS_METADATA_URL (or the base/ID env vars) are set so the Sheets proxy can return JSON."
       : "";
     const typeLabel = contentType || "unknown";
     throw new Error(
-      `Unexpected response from the Kobo proxy while loading ${context}. Expected JSON but received content-type \"${typeLabel}\".${hint} Response preview: ${preview}`,
+      `Unexpected response from the Sheets proxy while loading ${context}. Expected JSON but received content-type \"${typeLabel}\".${hint} Response preview: ${preview}`,
     );
   }
 
@@ -696,13 +696,13 @@ function parseJsonResponse(rawBody: string, contentType: string, context: string
     const message = error instanceof Error && error.message ? error.message : "Unknown parser error.";
     const preview = summarizeBody(rawBody);
     throw new Error(
-      `Failed to parse Kobo ${context} response as JSON (${message}). Response preview: ${preview}`,
+      `Failed to parse Sheets ${context} response as JSON (${message}). Response preview: ${preview}`,
     );
   }
 }
 
-export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
-  const url = getKoboProxyUrl("data");
+export async function fetchSheetsAnalytics(): Promise<DashboardAnalytics> {
+  const url = getSheetsProxyUrl("data");
   let response: Response;
   try {
     response = await fetch(url, {
@@ -714,7 +714,7 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
     const details =
       error instanceof Error && error.message ? error.message : "The network request failed.";
     throw new Error(
-      `Unable to reach the Kobo data endpoint. Please check your internet connection and proxy configuration. (${details})`,
+      `Unable to reach the Sheets data endpoint. Please check your internet connection and proxy configuration. (${details})`,
     );
   }
 
@@ -722,7 +722,7 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
   const rawBody = await response.text();
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Kobo data (${response.status}): ${summarizeBody(rawBody)}`);
+    throw new Error(`Failed to fetch Sheets data (${response.status}): ${summarizeBody(rawBody)}`);
   }
 
   const payload = parseJsonResponse(rawBody, contentType, "data");
@@ -735,7 +735,7 @@ export async function fetchKoboAnalytics(): Promise<DashboardAnalytics> {
   return buildAnalytics(results);
 }
 
-function normalizeAsset(raw: RawAsset): KoboAssetSummary | null {
+function normalizeAsset(raw: RawAsset): SheetsAssetSummary | null {
   const rawUid = raw.uid;
   let uid: string | null = null;
   if (typeof rawUid === "string" && rawUid.trim().length > 0) {
@@ -783,8 +783,8 @@ function normalizeAsset(raw: RawAsset): KoboAssetSummary | null {
   };
 }
 
-export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
-  const url = getKoboProxyUrl("assets");
+export async function fetchSheetsAssets(): Promise<SheetsAssetSummary[]> {
+  const url = getSheetsProxyUrl("assets");
 
   let response: Response;
   try {
@@ -797,7 +797,7 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
     const details =
       error instanceof Error && error.message ? error.message : "The network request failed.";
     throw new Error(
-      `Unable to reach the Kobo assets endpoint. Please verify the proxy configuration. (${details})`,
+      `Unable to reach the Sheets assets endpoint. Please verify the proxy configuration. (${details})`,
     );
   }
 
@@ -805,7 +805,7 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
   const rawBody = await response.text();
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Kobo assets (${response.status}): ${summarizeBody(rawBody)}`);
+    throw new Error(`Failed to fetch Sheets assets (${response.status}): ${summarizeBody(rawBody)}`);
   }
 
   const payload = parseJsonResponse(rawBody, contentType, "assets");
@@ -817,7 +817,7 @@ export async function fetchKoboAssets(): Promise<KoboAssetSummary[]> {
 
   return results
     .map((item) => normalizeAsset(item))
-    .filter((asset): asset is KoboAssetSummary => asset !== null);
+    .filter((asset): asset is SheetsAssetSummary => asset !== null);
 }
 
 function formatNullableMetric(value: number | null): string {

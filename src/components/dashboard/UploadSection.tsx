@@ -4,7 +4,7 @@ import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from "lucide-react
 import { useState } from "react";
 import { toast } from "sonner";
 
-import KoboAssetList from "./KoboAssetList";
+import SheetsConnectionPanel from "./SheetsConnectionPanel";
 
 const UploadSection = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -204,7 +204,7 @@ const UploadSection = () => {
           </div>
         </CardContent>
       </Card>
-      <KoboAssetList />
+      <SheetsConnectionPanel />
     </div>
   );
 };

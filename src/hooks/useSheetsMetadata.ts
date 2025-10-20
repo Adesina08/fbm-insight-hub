@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchKoboAssets, type KoboAssetSummary } from "@/lib/kobo";
+import { fetchSheetsAssets, type SheetsAssetSummary } from "@/lib/sheets";
 
-export const KOBO_ASSETS_QUERY_KEY = ["kobo", "assets", "list"];
+export const SHEETS_ASSETS_QUERY_KEY = ["sheets", "metadata", "list"];
 
-export interface UseKoboAssetsResult {
-  data: KoboAssetSummary[];
+export interface UseSheetsMetadataResult {
+  data: SheetsAssetSummary[];
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -12,10 +12,10 @@ export interface UseKoboAssetsResult {
   refetch: () => void;
 }
 
-export const useKoboAssets = (): UseKoboAssetsResult => {
-  const query = useQuery<KoboAssetSummary[], Error>({
-    queryKey: KOBO_ASSETS_QUERY_KEY,
-    queryFn: fetchKoboAssets,
+export const useSheetsMetadata = (): UseSheetsMetadataResult => {
+  const query = useQuery<SheetsAssetSummary[], Error>({
+    queryKey: SHEETS_ASSETS_QUERY_KEY,
+    queryFn: fetchSheetsAssets,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });

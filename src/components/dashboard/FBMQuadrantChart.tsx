@@ -5,7 +5,7 @@ import { Target, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ScatterPoint } from "@/lib/kobo";
+import type { ScatterPoint } from "@/lib/sheets";
 
 interface FBMQuadrantChartProps {
   points?: ScatterPoint[];
@@ -22,7 +22,7 @@ const LoadingState = () => (
 
 const EmptyState = () => (
   <div className="p-6 text-sm text-muted-foreground bg-muted/20 rounded-lg">
-    Kobo submissions must include motivation, ability, and current use indicators to render the quadrant plot.
+    Google Sheets submissions must include motivation, ability, and current use indicators to render the quadrant plot.
   </div>
 );
 
@@ -264,8 +264,7 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
             selected driver, helping you spot leverage points by quadrant.
           </p>
           <p>
-            The chart refreshes automatically when a new Kobo submission arrives, ensuring the behavioral segmentation remains
-            live.
+            The chart refreshes automatically when new Google Sheets rows are synced, keeping the behavioural segmentation live.
           </p>
         </CardContent>
       </Card>
