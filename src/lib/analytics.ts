@@ -1,3 +1,9 @@
+import {
+  QUESTIONNAIRE_CHOICE_LOOKUP,
+  QUESTIONNAIRE_QUESTION_LOOKUP,
+} from "./questionnaire";
+import type { QuestionnaireQuestion } from "./questionnaire";
+
 export const DEFAULT_FIELD_MAP = {
   motivation: "motivation_score",
   ability: "ability_score",
@@ -23,6 +29,75 @@ function normalizeKeyName(key: string | undefined): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+const MIN_TOKEN_LENGTH = 3;
+
+function findQuestion(questionId: string): QuestionnaireQuestion | undefined {
+  const trimmed = questionId?.trim();
+  if (!trimmed) return undefined;
+
+  return (
+    QUESTIONNAIRE_QUESTION_LOOKUP[trimmed]
+    ?? QUESTIONNAIRE_QUESTION_LOOKUP[trimmed.toUpperCase()]
+    ?? QUESTIONNAIRE_QUESTION_LOOKUP[trimmed.toLowerCase()]
+  );
+}
+
+function tokenizeText(text: string | undefined): string[] {
+  if (!text) return [];
+
+  return normalizeKeyName(text)
+    .split("_")
+    .filter((token) => token.length >= MIN_TOKEN_LENGTH);
+}
+
+function getQuestionTokens(questionId: string): string[] {
+  const tokens = new Set<string>();
+
+  const normalizedId = normalizeKeyName(questionId);
+  if (normalizedId) {
+    normalizedId
+      .split("_")
+      .filter(Boolean)
+      .forEach((token) => tokens.add(token));
+  }
+
+  const question = findQuestion(questionId);
+  if (question) {
+    tokenizeText(question.text).forEach((token) => tokens.add(token));
+  }
+
+  return Array.from(tokens);
+}
+
+function getQuestionOptionTokens(questionId: string, optionLabel: string): string[] {
+  const tokens = new Set<string>(getQuestionTokens(questionId));
+
+  tokenizeText(optionLabel).forEach((token) => tokens.add(token));
+
+  const question = findQuestion(questionId);
+  if (question?.choiceListId) {
+    const choiceList = QUESTIONNAIRE_CHOICE_LOOKUP[question.choiceListId];
+    const option = choiceList?.options.find((item) =>
+      item.label === optionLabel || normalizeKeyName(item.label) === normalizeKeyName(optionLabel),
+    );
+
+    if (option) {
+      tokenizeText(option.label).forEach((token) => tokens.add(token));
+      tokenizeText(option.value).forEach((token) => tokens.add(token));
+    }
+  }
+
+  return Array.from(tokens);
+}
+
+function getValueForQuestion(record: NormalizedRecord, questionId: string): unknown {
+  const tokens = getQuestionTokens(questionId);
+  if (tokens.length === 0) {
+    return getValueForTokens(record, [normalizeKeyName(questionId)]);
+  }
+  return getValueForTokens(record, tokens);
 }
 
 function buildNormalizedRecord(source: RawSubmission): NormalizedRecord {
@@ -444,57 +519,58 @@ function computePromptExposure(
 
 function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
   const motivation = averageNumbers([
-    parseLikertScore(getValueForTokens(record, ["c1"])),
-    parseLikertScore(getValueForTokens(record, ["c2"])),
-    parseLikertScore(getValueForTokens(record, ["c3"])),
-    parseLikertScore(getValueForTokens(record, ["c4"])),
+    parseLikertScore(getValueForQuestion(record, "C1")),
+    parseLikertScore(getValueForQuestion(record, "C2")),
+    parseLikertScore(getValueForQuestion(record, "C3")),
+    parseLikertScore(getValueForQuestion(record, "C4")),
   ]);
 
   const ability = averageNumbers([
-    parseLikertScore(getValueForTokens(record, ["d1"])),
-    parseLikertScore(getValueForTokens(record, ["d2"])),
-    parseLikertScore(getValueForTokens(record, ["d3"])),
-    parseLikertScore(getValueForTokens(record, ["d4"])),
-    parseLikertScore(getValueForTokens(record, ["d5"])),
-    parseLikertScore(getValueForTokens(record, ["d6"])),
+    parseLikertScore(getValueForQuestion(record, "D1")),
+    parseLikertScore(getValueForQuestion(record, "D2")),
+    parseLikertScore(getValueForQuestion(record, "D3")),
+    parseLikertScore(getValueForQuestion(record, "D4")),
+    parseLikertScore(getValueForQuestion(record, "D5")),
+    parseLikertScore(getValueForQuestion(record, "D6")),
   ]);
 
-  const descriptiveNorms = parseLikertScore(getValueForTokens(record, ["f1"]));
-  const injunctiveNorms = parseLikertScore(getValueForTokens(record, ["f2"]));
+  const descriptiveNorms = parseLikertScore(getValueForQuestion(record, "F1"));
+  const injunctiveNorms = parseLikertScore(getValueForQuestion(record, "F2"));
 
   const systemReadiness = averageNumbers([
-    parseLikertScore(getValueForTokens(record, ["g1"])),
-    parseLikertScore(getValueForTokens(record, ["g2"])),
-    parseLikertScore(getValueForTokens(record, ["g3"])),
+    parseLikertScore(getValueForQuestion(record, "G1")),
+    parseLikertScore(getValueForQuestion(record, "G2")),
+    parseLikertScore(getValueForQuestion(record, "G3")),
   ]);
 
-  const promptLikelihood = parseLikertScore(getValueForTokens(record, ["e2"]));
-  const noPromptTokens = ["e1", "no", "prompts"] as const;
+  const promptLikelihood = parseLikertScore(getValueForQuestion(record, "E2"));
+  const noPromptTokens = getQuestionOptionTokens("E1", "No prompts received");
+  const noPromptOptionTokens = noPromptTokens.length > 0 ? [...noPromptTokens] : undefined;
 
   const facilitatorExposure = computePromptExposure(
     record,
     [
-      ["e1", "health", "worker"],
-      ["e1", "community", "religious"],
+      getQuestionOptionTokens("E1", "Yes, from a health worker"),
+      getQuestionOptionTokens("E1", "Yes, from community/religious leaders"),
     ],
-    { noPromptTokens: [...noPromptTokens] },
+    { noPromptTokens: noPromptOptionTokens },
   );
 
   const sparkExposure = computePromptExposure(
     record,
-    [["e1", "media"]],
-    { noPromptTokens: [...noPromptTokens] },
+    [getQuestionOptionTokens("E1", "Yes, from media (radio, TV, social media)")],
+    { noPromptTokens: noPromptOptionTokens },
   );
 
   const signalExposure = computePromptExposure(
     record,
-    [["e1", "partner", "spouse"]],
-    { noPromptTokens: [...noPromptTokens] },
+    [getQuestionOptionTokens("E1", "Yes, from a partner/spouse")],
+    { noPromptTokens: noPromptOptionTokens },
   );
 
-  let currentUse = parseBoolean(getValueForTokens(record, ["b2"]));
+  let currentUse = parseBoolean(getValueForQuestion(record, "B2"));
   if (currentUse == null) {
-    const method = getValueForTokens(record, ["b3"]);
+    const method = getValueForQuestion(record, "B3");
     if (typeof method === "string" && method.trim().length > 0) {
       currentUse = true;
     }
@@ -526,6 +602,11 @@ function lookupFieldValue(record: NormalizedRecord, field: FieldKey, fieldMap: F
     if (match && record.has(match)) {
       return record.get(match);
     }
+  }
+
+  const questionValue = getValueForQuestion(record, fieldMap[field]);
+  if (questionValue !== undefined) {
+    return questionValue;
   }
 
   return undefined;
