@@ -1,6 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import type { Headers as FetchHeaders, Request as FetchRequest } from "undici";
 
+import { ensureFetchPolyfill } from "./polyfills";
+
+ensureFetchPolyfill();
+
 type CorsTarget = ServerResponse | FetchHeaders;
 
 function isFetchRequest(value: unknown): value is FetchRequest {
