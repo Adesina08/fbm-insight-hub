@@ -234,22 +234,7 @@ const Index = () => {
                 )}
               </div>
             </div>
-          ) : (
-            <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-3 rounded-lg border bg-card/95 p-4 shadow-lg sm:flex-row sm:items-center">
-              <div>
-                <p className="text-sm font-medium">Using uploaded file</p>
-                <p className="text-xs text-muted-foreground break-all">{uploadedFile?.name}</p>
-                {uploadSummary?.rowCount ? (
-                  <p className="text-xs text-muted-foreground">{uploadSummary.rowCount} records processed</p>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" onClick={handleUploadClick}>
-                  Replace file
-                </Button>
-              </div>
-            </div>
-          )}
+          ) : null}
         </>
       )}
 
@@ -271,7 +256,12 @@ const Index = () => {
                 <p className="text-xs text-muted-foreground mt-1 print:text-slate-500">{syncStatus}</p>
               </div>
             </div>
-            <div className="no-print">
+            <div className="no-print flex items-center gap-3">
+              {dataMode === "upload" && analytics ? (
+                <Button variant="outline" onClick={handleUploadClick} disabled={isProcessingUpload}>
+                  Replace file
+                </Button>
+              ) : null}
               <PDFExportButton targetRef={reportRef} disabled={isPdfDisabled} />
             </div>
           </div>
