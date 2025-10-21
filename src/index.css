@@ -240,6 +240,129 @@ All colors MUST be HSL.
     margin-top: 0.35rem;
   }
 
+  .print-report {
+    display: flex;
+    flex-direction: column;
+    gap: 1cm;
+  }
+
+  .print-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5cm, 1fr));
+    gap: 0.6cm;
+    margin: 0.75cm 0 0.6cm;
+  }
+
+  .print-metric-card {
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(255, 255, 255, 0.95);
+    padding: 0.6cm;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12), 0 10px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  .print-metric-card h3 {
+    margin: 0;
+    font-size: 11pt;
+    color: #0f172a;
+  }
+
+  .print-metric-card p {
+    margin: 0.3cm 0 0;
+    font-size: 18pt;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .print-insight-list {
+    margin: 0.45cm 0 0;
+    padding-left: 0.6cm;
+  }
+
+  .print-insight-list li {
+    margin-bottom: 0.3cm;
+    font-size: 10pt;
+    color: #1f2937;
+  }
+
+  .print-insight-list li:last-child {
+    margin-bottom: 0;
+  }
+
+  .print-subheading {
+    font-size: 12pt;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0 0 0.35cm;
+  }
+
+  .print-twocolumn {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7cm, 1fr));
+    gap: 0.9cm;
+  }
+
+  .print-segment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6cm, 1fr));
+    gap: 0.6cm;
+  }
+
+  .print-segment-card {
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(255, 255, 255, 0.92);
+    padding: 0.55cm;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+  }
+
+  .print-segment-card ul {
+    margin: 0.35cm 0 0;
+    padding-left: 0.5cm;
+  }
+
+  .print-segment-card li {
+    font-size: 9.5pt;
+    color: #334155;
+    margin-bottom: 0.25cm;
+  }
+
+  .print-segment-card li:last-child {
+    margin-bottom: 0;
+  }
+
+  .print-segment-title {
+    font-size: 11.5pt;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.1cm;
+  }
+
+  .print-segment-meta {
+    font-size: 9pt;
+    color: #475569;
+    margin-bottom: 0.4cm;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.55cm;
+  }
+
+  .print-table th,
+  .print-table td {
+    text-align: left;
+    padding: 0.35cm 0.25cm;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    font-size: 10pt;
+    color: #0f172a;
+  }
+
+  .print-table th {
+    font-weight: 600;
+  }
+
   .no-print {
     display: none !important;
   }

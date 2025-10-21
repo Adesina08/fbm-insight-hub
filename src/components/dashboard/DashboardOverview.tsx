@@ -13,6 +13,12 @@ interface DashboardOverviewProps {
   isLoading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  metadata?: DashboardOverviewMetadata | null;
+}
+
+export interface DashboardOverviewMetadata {
+  primary: string;
+  secondary?: string;
 }
 
 const formatNumber = (value: number | null | undefined, options: Intl.NumberFormatOptions = {}) => {
@@ -80,7 +86,15 @@ const ErrorState = ({ message, onRetry }: { message: string; onRetry?: () => voi
   </Alert>
 );
 
-const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, error, onRetry }: DashboardOverviewProps) => {
+const DashboardOverview = ({
+  stats,
+  quadrants,
+  lastUpdated,
+  isLoading = false,
+  error,
+  onRetry,
+  metadata,
+}: DashboardOverviewProps) => {
   if (isLoading) {
     return <LoadingState />;
   }
@@ -92,6 +106,14 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
   if (!stats || !quadrants) {
     return <ErrorState message="No submissions are available yet." onRetry={onRetry} />;
   }
+
+  const metadataContent: DashboardOverviewMetadata | null =
+    metadata === undefined
+      ? {
+          primary: `Last data sync: ${lastUpdatedLabel(lastUpdated)}`,
+          secondary: "Data refreshes automatically every minute.",
+        }
+      : metadata;
 
   const cards: Array<{
     title: string;
@@ -141,12 +163,16 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
   return (
     <div className="space-y-8 animate-fade-in print:space-y-10">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
-        <div>
-          <p className="text-sm text-muted-foreground print:text-slate-600">
-            Last data sync: <span className="font-medium text-foreground print:text-primary/80">{lastUpdatedLabel(lastUpdated)}</span>
-          </p>
-          <p className="text-xs text-muted-foreground print:text-slate-500">Data refreshes automatically every minute.</p>
-        </div>
+        {metadataContent ? (
+          <div>
+            <p className="text-sm text-muted-foreground print:text-slate-600">
+              {metadataContent.primary}
+            </p>
+            {metadataContent.secondary ? (
+              <p className="text-xs text-muted-foreground print:text-slate-500">{metadataContent.secondary}</p>
+            ) : null}
+          </div>
+        ) : null}
         {onRetry ? (
           <Button
             variant="outline"

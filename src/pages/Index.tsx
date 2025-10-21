@@ -1,12 +1,13 @@
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Users, Target, Zap, Network, Loader2 } from "lucide-react";
-import DashboardOverview from "@/components/dashboard/DashboardOverview";
+import DashboardOverview, { type DashboardOverviewMetadata } from "@/components/dashboard/DashboardOverview";
 import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
 import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivenessHeatmap";
 import PathDiagram from "@/components/dashboard/PathDiagram";
 import PDFExportButton from "@/components/dashboard/PDFExportButton";
+import ExecutivePrintReport from "@/components/dashboard/ExecutivePrintReport";
 import { useSheetsAnalytics } from "@/hooks/useSheetsAnalytics";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -72,6 +73,40 @@ const Index = () => {
     }
     return uploadedAnalytics;
   }, [data, isLiveMode, uploadedAnalytics]);
+
+  const overviewMetadata = useMemo<DashboardOverviewMetadata | null | undefined>(() => {
+    if (!dataMode) {
+      return null;
+    }
+
+    if (dataMode === "upload") {
+      if (uploadedAnalytics && uploadSummary?.rowCount) {
+        return {
+          primary: `Uploaded dataset analysed (${new Intl.NumberFormat().format(uploadSummary.rowCount)} records)`,
+          secondary: uploadedFile ? `Source file: ${uploadedFile.name}` : undefined,
+        } satisfies DashboardOverviewMetadata;
+      }
+
+      if (uploadedFile) {
+        return {
+          primary: `Source file: ${uploadedFile.name}`,
+          secondary: isProcessingUpload ? "Processing uploaded dataset…" : "Awaiting dataset parsing.",
+        } satisfies DashboardOverviewMetadata;
+      }
+
+      return {
+        primary: "Awaiting uploaded dataset",
+      } satisfies DashboardOverviewMetadata;
+    }
+
+    return undefined;
+  }, [
+    dataMode,
+    isProcessingUpload,
+    uploadSummary?.rowCount,
+    uploadedAnalytics,
+    uploadedFile,
+  ]);
 
   const handleConfirmMode = () => {
     if (pendingMode === "live" || pendingMode === "upload") {
@@ -270,7 +305,8 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-10 max-w-7xl flex-1 print-container print:px-0 print:py-0">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in print:space-y-0">
+        <div className="print:hidden">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in print:space-y-0">
           <TabsList className="grid w-full max-w-6xl grid-cols-5 mx-auto h-auto p-1.5 bg-card/50 backdrop-blur-sm shadow-md">
             <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
               <BarChart3 className="w-4 h-4" />
@@ -313,6 +349,7 @@ const Index = () => {
                 isLoading={isAnalyticsLoading}
                 error={analyticsError}
                 onRetry={retryHandler}
+                metadata={overviewMetadata}
               />
             </section>
           </TabsContent>
@@ -397,7 +434,16 @@ const Index = () => {
               />
             </section>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
+        <ExecutivePrintReport
+          analytics={analytics}
+          metadata={overviewMetadata}
+          isLoading={isAnalyticsLoading}
+          error={analyticsError}
+          dataMode={dataMode}
+          syncStatus={syncStatus}
+        />
       </main>
       <footer className="border-t bg-card/80 backdrop-blur-xl print-container print:border-primary/20 print:bg-gradient-to-r print:from-primary/10 print:to-transparent">
         <div className="container mx-auto px-6 py-4 max-w-7xl text-center">
