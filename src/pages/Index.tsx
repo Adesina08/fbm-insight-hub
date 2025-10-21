@@ -113,7 +113,7 @@ const Index = () => {
       </main>
       <footer className="border-t bg-card/80 backdrop-blur-xl">
         <div className="container mx-auto px-6 py-4 max-w-7xl text-center">
-          <p className="text-base font-semibold text-muted-foreground">Powered by Inicio Tech Team</p>
+          <p className="text-base font-semibold text-muted-foreground">&copy; 2025 Powered by Inicio Tech Team</p>
         </div>
       </footer>
     </div>
