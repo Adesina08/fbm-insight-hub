@@ -32,7 +32,7 @@ const Index = () => {
               />
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
-                  Behavioural Survey Dashboard
+                  Behavioural Survey Solution
                 </h1>
                 <p className="text-sm text-muted-foreground font-medium"> </p>
                 <p className="text-xs text-muted-foreground mt-1">{syncStatus}</p>
