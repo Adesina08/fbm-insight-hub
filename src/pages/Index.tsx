@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Users, Target, Zap, Network } from "lucide-react";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
@@ -6,11 +6,13 @@ import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
 import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivenessHeatmap";
 import PathDiagram from "@/components/dashboard/PathDiagram";
+import PDFExportButton from "@/components/dashboard/PDFExportButton";
 import { useSheetsAnalytics } from "@/hooks/useSheetsAnalytics";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const { data, isLoading, isError, error, refetch, isFetching } = useSheetsAnalytics();
+  const reportRef = useRef<HTMLDivElement>(null);
   const syncStatus = useMemo(() => {
     if (isLoading) return "Connecting to data source…";
     if (isFetching) return "Syncing latest submissions…";
@@ -19,9 +21,12 @@ const Index = () => {
   }, [error?.message, isError, isFetching, isLoading]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+    <div
+      ref={reportRef}
+      className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col print-page"
+    >
       {/* Header */}
-      <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
+      <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm print-container">
         <div className="container mx-auto px-6 py-5 max-w-7xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -38,12 +43,15 @@ const Index = () => {
                 <p className="text-xs text-muted-foreground mt-1">{syncStatus}</p>
               </div>
             </div>
+            <div className="no-print">
+              <PDFExportButton targetRef={reportRef} disabled={isLoading || isFetching} />
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-10 max-w-7xl flex-1">
+      <main className="container mx-auto px-6 py-10 max-w-7xl flex-1 print-container">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in">
           <TabsList className="grid w-full max-w-6xl grid-cols-5 mx-auto h-auto p-1.5 bg-card/50 backdrop-blur-sm shadow-md">
             <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
@@ -113,7 +121,7 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </main>
-      <footer className="border-t bg-card/80 backdrop-blur-xl">
+      <footer className="border-t bg-card/80 backdrop-blur-xl print-container">
         <div className="container mx-auto px-6 py-4 max-w-7xl text-center">
           <p className="text-base font-semibold text-muted-foreground">Powered by Inicio Tech Team &copy; 2025</p>
         </div>
