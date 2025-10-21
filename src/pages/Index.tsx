@@ -26,6 +26,7 @@ const Index = () => {
     enabled: isLiveMode,
   });
   const reportRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const syncStatus = useMemo(() => {
     if (!dataMode) {
       return "Select a data source to begin";
@@ -52,6 +53,19 @@ const Index = () => {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     setUploadedFile(file);
+    // Allow re-uploading the same file by resetting the input value
+    event.target.value = "";
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveFile = () => {
+    setUploadedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -101,6 +115,51 @@ const Index = () => {
             </Button>
           </div>
         </div>
+      )}
+
+      {dataMode === "upload" && (
+        <>
+          <Input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          {!uploadedFile ? (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/95 backdrop-blur-md p-6">
+              <div className="w-full max-w-lg rounded-xl border bg-card/95 p-8 shadow-xl space-y-6 text-center">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-semibold">Upload your dataset</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Select a CSV or spreadsheet export of your survey results to explore them in the dashboard.
+                  </p>
+                </div>
+                <div className="rounded-lg border border-dashed p-8 bg-muted/50">
+                  <p className="text-sm text-muted-foreground">Drag and drop your file here, or click below to browse.</p>
+                  <Button className="mt-4" onClick={handleUploadClick}>
+                    Choose file
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-3 rounded-lg border bg-card/95 p-4 shadow-lg sm:flex-row sm:items-center">
+              <div>
+                <p className="text-sm font-medium">Using uploaded file</p>
+                <p className="text-xs text-muted-foreground break-all">{uploadedFile.name}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={handleUploadClick}>
+                  Replace file
+                </Button>
+                <Button variant="ghost" onClick={handleRemoveFile}>
+                  Remove
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Header */}
