@@ -27,7 +27,7 @@ const Index = () => {
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-white/80 shadow-lg flex items-center justify-center">
                 <img
-                  src="public/images/inicio-logo.png"
+                  src="/images/inicio-logo.png"
                   alt="Inicio logo"
                   className="max-w-full max-h-full object-contain"
                 />
