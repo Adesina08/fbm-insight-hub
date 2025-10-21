@@ -131,23 +131,113 @@ All colors MUST be HSL.
   }
 }
 
+@page {
+  size: A4;
+  margin: 1.25cm;
+}
+
 @media print {
   body {
-    background: #ffffff !important;
+    background: #f8fafc !important;
     color: #0f172a !important;
+    font-size: 11pt;
+    line-height: 1.5;
   }
 
   .print-page {
     min-height: auto !important;
-    background: #ffffff !important;
+    background: transparent !important;
     box-shadow: none !important;
+    padding: 0 !important;
   }
 
   .print-container {
     background: #ffffff !important;
-    box-shadow: none !important;
-    border-color: transparent !important;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12) !important;
+    border: 1px solid rgba(148, 163, 184, 0.35) !important;
+    border-radius: 24px !important;
     position: static !important;
+    padding: 1.15cm !important;
+    margin-bottom: 1.15cm !important;
+  }
+
+  header.print-container {
+    margin-top: 0 !important;
+    margin-bottom: 0.9cm !important;
+  }
+
+  main.print-container {
+    background: linear-gradient(145deg, rgba(14, 165, 233, 0.06), rgba(236, 72, 153, 0.04)) !important;
+  }
+
+  footer.print-container {
+    box-shadow: none !important;
+    background: rgba(15, 23, 42, 0.04) !important;
+  }
+
+  .print-section {
+    page-break-inside: avoid;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: linear-gradient(140deg, rgba(14, 165, 233, 0.08), rgba(129, 140, 248, 0.06));
+    padding: 1cm;
+    margin-bottom: 1cm;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18), 0 10px 35px rgba(15, 23, 42, 0.14);
+  }
+
+  .print-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .print-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 2px solid rgba(14, 165, 233, 0.35);
+  }
+
+  .print-section-header h2 {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+  }
+
+  .print-section-header p {
+    font-size: 10pt;
+    color: #475569;
+    margin: 0;
+  }
+
+  .print-section-icon {
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.92), rgba(236, 72, 153, 0.82));
+    color: #ffffff;
+    box-shadow: 0 12px 28px rgba(14, 165, 233, 0.32);
+  }
+
+  .print-section-badge {
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #0369a1;
+    background: rgba(14, 165, 233, 0.18);
+    padding: 0.2rem 0.75rem;
+    border-radius: 9999px;
+    font-weight: 600;
+  }
+
+  .print-caption {
+    font-size: 9pt;
+    color: #475569;
+    margin-top: 0.35rem;
   }
 
   .no-print {
