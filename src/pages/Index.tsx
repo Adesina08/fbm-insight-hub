@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Users, Target, Activity, Zap, Network } from "lucide-react";
+import { BarChart3, Users, Target, Zap, Network } from "lucide-react";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
@@ -25,12 +25,14 @@ const Index = () => {
         <div className="container mx-auto px-6 py-5 max-w-7xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-chart-3 to-secondary flex items-center justify-center shadow-lg">
-                <Activity className="w-7 h-7 text-white" />
-              </div>
+              <img
+                src="/images/inicio-logo.svg"
+                alt="Inicio logo"
+                className="w-14 h-14 rounded-xl shadow-lg object-cover"
+              />
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
-                  BEHAV360
+                  Inicio Insights Dashboard
                 </h1>
                 <p className="text-sm text-muted-foreground font-medium">Survey Analytics Dashboard</p>
                 <p className="text-xs text-muted-foreground mt-1">{syncStatus}</p>
