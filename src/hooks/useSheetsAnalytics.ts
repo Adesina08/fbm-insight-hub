@@ -5,6 +5,10 @@ export const SHEETS_ANALYTICS_QUERY_KEY = ["sheets", "analytics"];
 
 export const REFRESH_INTERVAL_MS = 60_000;
 
+export interface UseSheetsAnalyticsOptions {
+  enabled?: boolean;
+}
+
 export interface UseSheetsAnalyticsResult {
   data: DashboardAnalytics | undefined;
   isLoading: boolean;
@@ -14,13 +18,18 @@ export interface UseSheetsAnalyticsResult {
   isFetching: boolean;
 }
 
-export const useSheetsAnalytics = (): UseSheetsAnalyticsResult => {
+export const useSheetsAnalytics = (
+  options: UseSheetsAnalyticsOptions = {},
+): UseSheetsAnalyticsResult => {
+  const { enabled = true } = options;
+
   const query = useQuery<DashboardAnalytics, Error>({
     queryKey: SHEETS_ANALYTICS_QUERY_KEY,
     queryFn: fetchSheetsAnalytics,
     refetchInterval: REFRESH_INTERVAL_MS,
     refetchIntervalInBackground: true,
     staleTime: REFRESH_INTERVAL_MS / 2,
+    enabled,
   });
 
   return {

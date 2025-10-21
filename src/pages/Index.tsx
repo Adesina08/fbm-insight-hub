@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Users, Target, Zap, Network } from "lucide-react";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
@@ -8,23 +8,101 @@ import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivene
 import PathDiagram from "@/components/dashboard/PathDiagram";
 import PDFExportButton from "@/components/dashboard/PDFExportButton";
 import { useSheetsAnalytics } from "@/hooks/useSheetsAnalytics";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+type DataMode = "live" | "upload";
 
 const Index = () => {
+
   const [activeTab, setActiveTab] = useState("overview");
-  const { data, isLoading, isError, error, refetch, isFetching } = useSheetsAnalytics();
+  const [dataMode, setDataMode] = useState<DataMode | null>(null);
+  const [pendingMode, setPendingMode] = useState<DataMode | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const isLiveMode = dataMode === "live";
+  const { data, isLoading, isError, error, refetch, isFetching } = useSheetsAnalytics({
+    enabled: isLiveMode,
+  });
   const reportRef = useRef<HTMLDivElement>(null);
   const syncStatus = useMemo(() => {
+    if (!dataMode) {
+      return "Select a data source to begin";
+    }
+    if (dataMode === "upload") {
+      return uploadedFile ? `Using uploaded file: ${uploadedFile.name}` : "Awaiting uploaded dataset";
+    }
     if (isLoading) return "Connecting to data source…";
     if (isFetching) return "Syncing latest submissions…";
     if (isError) return error?.message ?? "Sync error";
     return "Live data from connected source";
-  }, [error?.message, isError, isFetching, isLoading]);
+  }, [dataMode, error?.message, isError, isFetching, isLoading, uploadedFile]);
+
+  const handleConfirmMode = () => {
+    if (pendingMode === "live" || pendingMode === "upload") {
+      setDataMode(pendingMode);
+      if (pendingMode === "live") {
+        setUploadedFile(null);
+      }
+      setPendingMode(null);
+    }
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setUploadedFile(file);
+  };
 
   return (
     <div
       ref={reportRef}
       className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col print-page"
     >
+      {!dataMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-md p-6">
+          <div className="w-full max-w-lg rounded-xl border bg-card/95 p-8 shadow-xl space-y-6">
+            <div className="space-y-2 text-center">
+              <h2 className="text-2xl font-semibold">Choose your data source</h2>
+              <p className="text-sm text-muted-foreground">
+                Would you like to view the live analytics from the connected data source or upload your own dataset?
+              </p>
+            </div>
+            <RadioGroup
+              value={pendingMode ?? ""}
+              onValueChange={(value) => setPendingMode(value as DataMode)}
+              className="space-y-4"
+            >
+              <div className="flex items-start space-x-3 rounded-lg border p-4">
+                <RadioGroupItem value="live" id="mode-live" className="mt-1" />
+                <div>
+                  <Label htmlFor="mode-live" className="text-base font-medium">
+                    Use live data source
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Automatically syncs the latest survey submissions and keeps your dashboard up to date.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3 rounded-lg border p-4">
+                <RadioGroupItem value="upload" id="mode-upload" className="mt-1" />
+                <div>
+                  <Label htmlFor="mode-upload" className="text-base font-medium">
+                    Upload my dataset
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Provide a CSV export of your survey results to explore them within the dashboard experience.
+                  </p>
+                </div>
+              </div>
+            </RadioGroup>
+            <Button className="w-full" onClick={handleConfirmMode} disabled={!pendingMode}>
+              Continue
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm print-container print:border-primary/30 print:bg-gradient-to-r print:from-primary/12 print:to-chart-3/10 print:shadow-none">
         <div className="container mx-auto px-6 py-5 max-w-7xl">
@@ -44,7 +122,7 @@ const Index = () => {
               </div>
             </div>
             <div className="no-print">
-              <PDFExportButton targetRef={reportRef} disabled={isLoading || isFetching} />
+              <PDFExportButton targetRef={reportRef} disabled={!isLiveMode || isLoading || isFetching} />
             </div>
           </div>
         </div>
