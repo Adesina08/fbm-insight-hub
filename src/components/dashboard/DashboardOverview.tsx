@@ -139,41 +139,51 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
   const hasQuadrantData = quadrants.some((quadrant) => quadrant.count > 0);
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <div className="space-y-8 animate-fade-in print:space-y-10">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
         <div>
-          <p className="text-sm text-muted-foreground">
-            Last data sync: <span className="font-medium text-foreground">{lastUpdatedLabel(lastUpdated)}</span>
+          <p className="text-sm text-muted-foreground print:text-slate-600">
+            Last data sync: <span className="font-medium text-foreground print:text-primary/80">{lastUpdatedLabel(lastUpdated)}</span>
           </p>
-          <p className="text-xs text-muted-foreground">Data refreshes automatically every minute.</p>
+          <p className="text-xs text-muted-foreground print:text-slate-500">Data refreshes automatically every minute.</p>
         </div>
         {onRetry ? (
-          <Button variant="outline" size="sm" onClick={onRetry} className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="flex items-center gap-2 print:hidden"
+          >
             <RefreshCcw className="h-4 w-4" />
             Refresh now
           </Button>
         ) : null}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 print:grid-cols-2 print:gap-5">
         {cards.map((card) => {
           const Icon = card.trendIcon;
           return (
-            <Card key={card.title} className="group relative overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-card/50 backdrop-blur-sm">
-              <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-5 group-hover:opacity-10 transition-opacity`} />
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <Card
+              key={card.title}
+              className="group relative overflow-hidden hover:shadow-xl transition-all duration-300 border-0 bg-card/50 backdrop-blur-sm print:border print:border-primary/20 print:bg-white/95"
+            >
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-5 group-hover:opacity-10 transition-opacity print:opacity-20`}
+              />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 print:pb-4">
+                <CardTitle className="text-sm font-medium text-muted-foreground print:text-slate-700">
                   {card.title}
                 </CardTitle>
-                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg`}>
-                  <Icon className="h-5 w-5 text-white" />
+                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${card.gradient} shadow-lg print:shadow-md print:ring-2 print:ring-white/70`}>
+                  <Icon className="h-5 w-5 text-white print:text-white" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
+              <CardContent className="print:bg-white/90">
+                <div className="text-3xl font-bold print:text-[24pt] print:text-slate-900">
                   {card.value}
                   {card.suffix && card.value !== "n/a" ? (
-                    <span className="text-base font-medium text-muted-foreground">{card.suffix}</span>
+                    <span className="text-base font-medium text-muted-foreground print:text-slate-600">{card.suffix}</span>
                   ) : null}
                 </div>
               </CardContent>
@@ -182,15 +192,15 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
         })}
       </div>
 
-      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
-        <CardHeader className="pb-6">
+      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm print:border print:border-primary/25 print:bg-white/95">
+        <CardHeader className="pb-6 print:pb-6">
           <div className="flex items-start gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
-              <Target className="w-6 h-6 text-white" />
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg print:shadow-md print:ring-2 print:ring-white/70">
+              <Target className="w-6 h-6 text-white print:text-white" />
             </div>
             <div>
-              <CardTitle className="text-2xl">FBM Quadrant Distribution</CardTitle>
-              <CardDescription className="text-base mt-1">
+              <CardTitle className="text-2xl print:text-[20pt]">FBM Quadrant Distribution</CardTitle>
+              <CardDescription className="text-base mt-1 print:text-slate-600">
                 Respondent distribution across Fogg Behavior Model quadrants
               </CardDescription>
             </div>
