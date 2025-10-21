@@ -140,7 +140,7 @@ const DashboardOverview = ({ stats, quadrants, lastUpdated, isLoading = false, e
 
   return (
     <div className="space-y-8 animate-fade-in print:space-y-10">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
         <div>
           <p className="text-sm text-muted-foreground print:text-slate-600">
             Last data sync: <span className="font-medium text-foreground print:text-primary/80">{lastUpdatedLabel(lastUpdated)}</span>
