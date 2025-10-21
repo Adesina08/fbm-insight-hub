@@ -19,7 +19,7 @@ const Index = () => {
   }, [error?.message, isError, isFetching, isLoading]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Header */}
       <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-6 py-5 max-w-7xl">
@@ -41,7 +41,7 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-10 max-w-7xl">
+      <main className="container mx-auto px-6 py-10 max-w-7xl flex-1">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in">
           <TabsList className="grid w-full max-w-6xl grid-cols-5 mx-auto h-auto p-1.5 bg-card/50 backdrop-blur-sm shadow-md">
             <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
@@ -111,6 +111,11 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </main>
+      <footer className="border-t bg-card/80 backdrop-blur-xl">
+        <div className="container mx-auto px-6 py-4 max-w-7xl text-center">
+          <p className="text-base font-semibold text-muted-foreground">Powered by Inicio Tech Team</p>
+        </div>
+      </footer>
     </div>
   );
 };
