@@ -1,6 +1,6 @@
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Users, Target, Zap, Network } from "lucide-react";
+import { BarChart3, Users, Target, Zap, Network, Loader2 } from "lucide-react";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
@@ -12,6 +12,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseUploadedDataset } from "@/lib/uploadAnalytics";
+import type { DashboardAnalytics } from "@/lib/googleSheets";
 
 type DataMode = "live" | "upload";
 
@@ -21,6 +23,10 @@ const Index = () => {
   const [dataMode, setDataMode] = useState<DataMode | null>(null);
   const [pendingMode, setPendingMode] = useState<DataMode | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedAnalytics, setUploadedAnalytics] = useState<DashboardAnalytics | null>(null);
+  const [isProcessingUpload, setIsProcessingUpload] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSummary, setUploadSummary] = useState<{ rowCount: number } | null>(null);
   const isLiveMode = dataMode === "live";
   const { data, isLoading, isError, error, refetch, isFetching } = useSheetsAnalytics({
     enabled: isLiveMode,
@@ -32,29 +38,89 @@ const Index = () => {
       return "Select a data source to begin";
     }
     if (dataMode === "upload") {
+      if (isProcessingUpload) {
+        return "Processing uploaded dataset…";
+      }
+      if (uploadError) {
+        return `Upload error: ${uploadError}`;
+      }
+      if (uploadedAnalytics && uploadSummary?.rowCount) {
+        return `Using uploaded dataset (${uploadSummary.rowCount} records)`;
+      }
       return uploadedFile ? `Using uploaded file: ${uploadedFile.name}` : "Awaiting uploaded dataset";
     }
     if (isLoading) return "Connecting to data source…";
     if (isFetching) return "Syncing latest submissions…";
     if (isError) return error?.message ?? "Sync error";
     return "Live data from connected source";
-  }, [dataMode, error?.message, isError, isFetching, isLoading, uploadedFile]);
+  }, [
+    dataMode,
+    error?.message,
+    isError,
+    isFetching,
+    isLoading,
+    isProcessingUpload,
+    uploadError,
+    uploadedAnalytics,
+    uploadedFile,
+    uploadSummary?.rowCount,
+  ]);
+
+  const analytics = useMemo(() => {
+    if (isLiveMode) {
+      return data ?? null;
+    }
+    return uploadedAnalytics;
+  }, [data, isLiveMode, uploadedAnalytics]);
 
   const handleConfirmMode = () => {
     if (pendingMode === "live" || pendingMode === "upload") {
       setDataMode(pendingMode);
       if (pendingMode === "live") {
         setUploadedFile(null);
+        setUploadedAnalytics(null);
+        setUploadError(null);
+        setUploadSummary(null);
+        setIsProcessingUpload(false);
       }
       setPendingMode(null);
     }
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
+    setUploadError(null);
+    setUploadSummary(null);
+    setUploadedAnalytics(null);
     setUploadedFile(file);
     // Allow re-uploading the same file by resetting the input value
     event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (extension && extension !== "csv") {
+      setUploadError("Only CSV files are supported at the moment. Please upload a .csv export.");
+      setUploadedFile(null);
+      return;
+    }
+
+    setIsProcessingUpload(true);
+    try {
+      const result = await parseUploadedDataset(file);
+      setUploadedAnalytics(result.analytics);
+      setUploadSummary({ rowCount: result.rowCount });
+    } catch (parseError) {
+      const message =
+        parseError instanceof Error && parseError.message
+          ? parseError.message
+          : "We couldn't process that file. Please check the format and try again.";
+      setUploadError(message);
+      setUploadedFile(null);
+    } finally {
+      setIsProcessingUpload(false);
+    }
   };
 
   const handleUploadClick = () => {
@@ -63,10 +129,28 @@ const Index = () => {
 
   const handleRemoveFile = () => {
     setUploadedFile(null);
+    setUploadedAnalytics(null);
+    setUploadError(null);
+    setUploadSummary(null);
+    setIsProcessingUpload(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
+
+  const isPdfDisabled = useMemo(() => {
+    if (!analytics) {
+      return true;
+    }
+    if (isLiveMode) {
+      return isLoading || isFetching;
+    }
+    return isProcessingUpload;
+  }, [analytics, isFetching, isLiveMode, isLoading, isProcessingUpload]);
+
+  const isAnalyticsLoading = isLiveMode ? (isLoading || isFetching) : isProcessingUpload;
+  const analyticsError = isLiveMode && isError ? error?.message ?? "Unable to load analytics data." : null;
+  const retryHandler = isLiveMode ? refetch : undefined;
 
   return (
     <div
@@ -126,28 +210,49 @@ const Index = () => {
             onChange={handleFileChange}
             className="hidden"
           />
-          {!uploadedFile ? (
+          {!analytics ? (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/95 backdrop-blur-md p-6">
               <div className="w-full max-w-lg rounded-xl border bg-card/95 p-8 shadow-xl space-y-6 text-center">
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold">Upload your dataset</h2>
+                  <h2 className="text-2xl font-semibold">
+                    {isProcessingUpload ? "Processing your dataset" : "Upload your dataset"}
+                  </h2>
                   <p className="text-sm text-muted-foreground">
-                    Select a CSV or spreadsheet export of your survey results to explore them in the dashboard.
+                    {isProcessingUpload
+                      ? "We are parsing your file and preparing the dashboard. This can take a few seconds for larger datasets."
+                      : "Select a CSV export of your survey results to explore them in the dashboard."}
                   </p>
                 </div>
-                <div className="rounded-lg border border-dashed p-8 bg-muted/50">
-                  <p className="text-sm text-muted-foreground">Drag and drop your file here, or click below to browse.</p>
-                  <Button className="mt-4" onClick={handleUploadClick}>
-                    Choose file
-                  </Button>
-                </div>
+                {uploadError ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-destructive font-medium">{uploadError}</p>
+                    <Button className="w-full" onClick={handleUploadClick}>
+                      Try again
+                    </Button>
+                  </div>
+                ) : isProcessingUpload ? (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 bg-muted/50">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Please wait while we process your file…</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-8 bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Drag and drop your file here, or click below to browse.</p>
+                    <Button className="mt-4" onClick={handleUploadClick}>
+                      Choose file
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
             <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-3 rounded-lg border bg-card/95 p-4 shadow-lg sm:flex-row sm:items-center">
               <div>
                 <p className="text-sm font-medium">Using uploaded file</p>
-                <p className="text-xs text-muted-foreground break-all">{uploadedFile.name}</p>
+                <p className="text-xs text-muted-foreground break-all">{uploadedFile?.name}</p>
+                {uploadSummary?.rowCount ? (
+                  <p className="text-xs text-muted-foreground">{uploadSummary.rowCount} records processed</p>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="secondary" onClick={handleUploadClick}>
@@ -181,7 +286,7 @@ const Index = () => {
               </div>
             </div>
             <div className="no-print">
-              <PDFExportButton targetRef={reportRef} disabled={!isLiveMode || isLoading || isFetching} />
+              <PDFExportButton targetRef={reportRef} disabled={isPdfDisabled} />
             </div>
           </div>
         </div>
@@ -226,12 +331,12 @@ const Index = () => {
                 <span className="print-section-badge">Overview</span>
               </div>
               <DashboardOverview
-                stats={data?.stats}
-                quadrants={data?.quadrants}
-                lastUpdated={data?.lastUpdated}
-                isLoading={isLoading}
-                error={isError ? error?.message ?? "" : null}
-                onRetry={refetch}
+                stats={analytics?.stats}
+                quadrants={analytics?.quadrants}
+                lastUpdated={analytics?.lastUpdated}
+                isLoading={isAnalyticsLoading}
+                error={analyticsError}
+                onRetry={retryHandler}
               />
             </section>
           </TabsContent>
@@ -249,9 +354,9 @@ const Index = () => {
                 <span className="print-section-badge">FBM</span>
               </div>
               <FBMQuadrantChart
-                points={data?.scatter}
-                isLoading={isLoading}
-                error={isError ? error?.message ?? "" : null}
+                points={analytics?.scatter}
+                isLoading={isAnalyticsLoading}
+                error={analyticsError}
               />
             </section>
           </TabsContent>
@@ -269,9 +374,9 @@ const Index = () => {
                 <span className="print-section-badge">Segments</span>
               </div>
               <SegmentProfiles
-                segments={data?.segments}
-                isLoading={isLoading}
-                error={isError ? error?.message ?? "" : null}
+                segments={analytics?.segments}
+                isLoading={isAnalyticsLoading}
+                error={analyticsError}
               />
             </section>
           </TabsContent>
@@ -289,9 +394,9 @@ const Index = () => {
                 <span className="print-section-badge">Prompts</span>
               </div>
               <PromptEffectivenessHeatmap
-                rows={data?.promptEffectiveness}
-                isLoading={isLoading}
-                error={isError ? error?.message ?? "" : null}
+                rows={analytics?.promptEffectiveness}
+                isLoading={isAnalyticsLoading}
+                error={analyticsError}
               />
             </section>
           </TabsContent>
@@ -309,10 +414,10 @@ const Index = () => {
                 <span className="print-section-badge">Model</span>
               </div>
               <PathDiagram
-                regression={data?.regression}
-                summary={data?.modelSummary}
-                isLoading={isLoading}
-                error={isError ? error?.message ?? "" : null}
+                regression={analytics?.regression}
+                summary={analytics?.modelSummary}
+                isLoading={isAnalyticsLoading}
+                error={analyticsError}
               />
             </section>
           </TabsContent>
