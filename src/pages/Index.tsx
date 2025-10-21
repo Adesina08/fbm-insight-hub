@@ -26,7 +26,7 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <img
-                src="/images/inicio-logo.png"
+                src="public/images/inicio-logo.png"
                 alt="Inicio logo"
                 className="w-14 h-14 rounded-xl shadow-lg object-cover"
               />
