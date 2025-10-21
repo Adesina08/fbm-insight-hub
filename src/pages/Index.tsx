@@ -25,11 +25,11 @@ const Index = () => {
         <div className="container mx-auto px-6 py-5 max-w-7xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-xl bg-white/70 backdrop-blur flex items-center justify-center shadow-sm">
+              <div className="h-16 w-16 rounded-xl bg-white/80 backdrop-blur flex items-center justify-center shadow-md ring-1 ring-primary/20">
                 <img
                   src="/images/inicio-logo.png"
                   alt="Inicio logo"
-                  className="h-10 w-auto object-contain"
+                  className="h-12 w-auto object-contain drop-shadow"
                 />
               </div>
               <div>
