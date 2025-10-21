@@ -127,17 +127,6 @@ const Index = () => {
     fileInputRef.current?.click();
   };
 
-  const handleRemoveFile = () => {
-    setUploadedFile(null);
-    setUploadedAnalytics(null);
-    setUploadError(null);
-    setUploadSummary(null);
-    setIsProcessingUpload(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
   const isPdfDisabled = useMemo(() => {
     if (!analytics) {
       return true;
@@ -257,9 +246,6 @@ const Index = () => {
               <div className="flex items-center gap-2">
                 <Button variant="secondary" onClick={handleUploadClick}>
                   Replace file
-                </Button>
-                <Button variant="ghost" onClick={handleRemoveFile}>
-                  Remove
                 </Button>
               </div>
             </div>
