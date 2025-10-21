@@ -25,11 +25,13 @@ const Index = () => {
         <div className="container mx-auto px-6 py-5 max-w-7xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-xl bg-white/70 backdrop-blur flex items-center justify-center shadow-sm">
                 <img
                   src="/images/inicio-logo.png"
                   alt="Inicio logo"
-                  className="max-w-full max-h-full object-contain"
+                  className="h-10 w-auto object-contain"
                 />
+              </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
                   Behavioural Survey Dashboard
