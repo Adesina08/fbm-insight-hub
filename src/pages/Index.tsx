@@ -76,7 +76,7 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6 mt-8">
+          <TabsContent value="overview" className="space-y-6 mt-8" forceMount>
             <DashboardOverview
               stats={data?.stats}
               quadrants={data?.quadrants}
@@ -87,7 +87,7 @@ const Index = () => {
             />
           </TabsContent>
 
-          <TabsContent value="fbm" className="space-y-6 mt-8">
+          <TabsContent value="fbm" className="space-y-6 mt-8" forceMount>
             <FBMQuadrantChart
               points={data?.scatter}
               isLoading={isLoading}
@@ -95,7 +95,7 @@ const Index = () => {
             />
           </TabsContent>
 
-          <TabsContent value="segments" className="space-y-6 mt-8">
+          <TabsContent value="segments" className="space-y-6 mt-8" forceMount>
             <SegmentProfiles
               segments={data?.segments}
               isLoading={isLoading}
@@ -103,7 +103,7 @@ const Index = () => {
             />
           </TabsContent>
 
-          <TabsContent value="prompts" className="space-y-6 mt-8">
+          <TabsContent value="prompts" className="space-y-6 mt-8" forceMount>
             <PromptEffectivenessHeatmap
               rows={data?.promptEffectiveness}
               isLoading={isLoading}
@@ -111,7 +111,7 @@ const Index = () => {
             />
           </TabsContent>
 
-          <TabsContent value="regression" className="space-y-6 mt-8">
+          <TabsContent value="regression" className="space-y-6 mt-8" forceMount>
             <PathDiagram
               regression={data?.regression}
               summary={data?.modelSummary}

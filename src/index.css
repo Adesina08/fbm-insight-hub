@@ -153,4 +153,21 @@ All colors MUST be HSL.
   .no-print {
     display: none !important;
   }
+
+  [data-radix-tabs-content] {
+    display: block !important;
+    opacity: 1 !important;
+    transform: none !important;
+    height: auto !important;
+    pointer-events: auto !important;
+    margin-top: 2rem !important;
+  }
+
+  [data-radix-tabs-content][data-state="inactive"] {
+    display: block !important;
+  }
+
+  [role="tablist"] {
+    display: none !important;
+  }
 }
