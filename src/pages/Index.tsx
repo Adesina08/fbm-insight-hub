@@ -26,21 +26,21 @@ const Index = () => {
       className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col print-page"
     >
       {/* Header */}
-      <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm print-container">
+      <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm print-container print:border-primary/30 print:bg-gradient-to-r print:from-primary/12 print:to-chart-3/10 print:shadow-none">
         <div className="container mx-auto px-6 py-5 max-w-7xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <img
                 src="/images/inicio-logo.png"
                 alt="Inicio logo"
-                className="h-16 w-auto object-contain"
+                className="h-16 w-auto object-contain print:h-14"
               />
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent">
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent print:text-transparent print:bg-gradient-to-r print:from-primary/80 print:to-chart-3/80">
                   Behavioural Survey Solution
                 </h1>
-                <p className="text-sm text-muted-foreground font-medium"> </p>
-                <p className="text-xs text-muted-foreground mt-1">{syncStatus}</p>
+                <p className="text-sm text-muted-foreground font-medium print:text-slate-600"> </p>
+                <p className="text-xs text-muted-foreground mt-1 print:text-slate-500">{syncStatus}</p>
               </div>
             </div>
             <div className="no-print">
@@ -51,8 +51,8 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-10 max-w-7xl flex-1 print-container">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in">
+      <main className="container mx-auto px-6 py-10 max-w-7xl flex-1 print-container print:px-0 print:py-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in print:space-y-0">
           <TabsList className="grid w-full max-w-6xl grid-cols-5 mx-auto h-auto p-1.5 bg-card/50 backdrop-blur-sm shadow-md">
             <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
               <BarChart3 className="w-4 h-4" />
@@ -76,54 +76,116 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6 mt-8" forceMount>
-            <DashboardOverview
-              stats={data?.stats}
-              quadrants={data?.quadrants}
-              lastUpdated={data?.lastUpdated}
-              isLoading={isLoading}
-              error={isError ? error?.message ?? "" : null}
-              onRetry={refetch}
-            />
+          <TabsContent value="overview" className="space-y-6 mt-8 print:space-y-0 print:mt-0" forceMount>
+            <section className="space-y-6 print:space-y-8 print-section">
+              <div className="hidden print:flex print-section-header">
+                <div className="print-section-icon">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h2>Executive Overview</h2>
+                  <p>Key behavioural adoption metrics and respondent distribution at a glance.</p>
+                </div>
+                <span className="print-section-badge">Overview</span>
+              </div>
+              <DashboardOverview
+                stats={data?.stats}
+                quadrants={data?.quadrants}
+                lastUpdated={data?.lastUpdated}
+                isLoading={isLoading}
+                error={isError ? error?.message ?? "" : null}
+                onRetry={refetch}
+              />
+            </section>
           </TabsContent>
 
-          <TabsContent value="fbm" className="space-y-6 mt-8" forceMount>
-            <FBMQuadrantChart
-              points={data?.scatter}
-              isLoading={isLoading}
-              error={isError ? error?.message ?? "" : null}
-            />
+          <TabsContent value="fbm" className="space-y-6 mt-8 print:space-y-0 print:mt-0" forceMount>
+            <section className="space-y-6 print:space-y-8 print-section">
+              <div className="hidden print:flex print-section-header">
+                <div className="print-section-icon">
+                  <Target className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h2>FBM Quadrant Insights</h2>
+                  <p>Visualising ability versus motivation with behaviour outcomes for each respondent.</p>
+                </div>
+                <span className="print-section-badge">FBM</span>
+              </div>
+              <FBMQuadrantChart
+                points={data?.scatter}
+                isLoading={isLoading}
+                error={isError ? error?.message ?? "" : null}
+              />
+            </section>
           </TabsContent>
 
-          <TabsContent value="segments" className="space-y-6 mt-8" forceMount>
-            <SegmentProfiles
-              segments={data?.segments}
-              isLoading={isLoading}
-              error={isError ? error?.message ?? "" : null}
-            />
+          <TabsContent value="segments" className="space-y-6 mt-8 print:space-y-0 print:mt-0" forceMount>
+            <section className="space-y-6 print:space-y-8 print-section">
+              <div className="hidden print:flex print-section-header">
+                <div className="print-section-icon">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h2>Segment Profiles</h2>
+                  <p>Personas, strengths, and barriers that guide tailored engagement approaches.</p>
+                </div>
+                <span className="print-section-badge">Segments</span>
+              </div>
+              <SegmentProfiles
+                segments={data?.segments}
+                isLoading={isLoading}
+                error={isError ? error?.message ?? "" : null}
+              />
+            </section>
           </TabsContent>
 
-          <TabsContent value="prompts" className="space-y-6 mt-8" forceMount>
-            <PromptEffectivenessHeatmap
-              rows={data?.promptEffectiveness}
-              isLoading={isLoading}
-              error={isError ? error?.message ?? "" : null}
-            />
+          <TabsContent value="prompts" className="space-y-6 mt-8 print:space-y-0 print:mt-0" forceMount>
+            <section className="space-y-6 print:space-y-8 print-section">
+              <div className="hidden print:flex print-section-header">
+                <div className="print-section-icon">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h2>Prompt Effectiveness</h2>
+                  <p>Performance of behavioural nudges mapped against motivation, ability, and outcomes.</p>
+                </div>
+                <span className="print-section-badge">Prompts</span>
+              </div>
+              <PromptEffectivenessHeatmap
+                rows={data?.promptEffectiveness}
+                isLoading={isLoading}
+                error={isError ? error?.message ?? "" : null}
+              />
+            </section>
           </TabsContent>
 
-          <TabsContent value="regression" className="space-y-6 mt-8" forceMount>
-            <PathDiagram
-              regression={data?.regression}
-              summary={data?.modelSummary}
-              isLoading={isLoading}
-              error={isError ? error?.message ?? "" : null}
-            />
+          <TabsContent value="regression" className="space-y-6 mt-8 print:space-y-0 print:mt-0" forceMount>
+            <section className="space-y-6 print:space-y-8 print-section">
+              <div className="hidden print:flex print-section-header">
+                <div className="print-section-icon">
+                  <Network className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h2>Model Pathways</h2>
+                  <p>System drivers and behavioural pathways powering contraceptive adoption.</p>
+                </div>
+                <span className="print-section-badge">Model</span>
+              </div>
+              <PathDiagram
+                regression={data?.regression}
+                summary={data?.modelSummary}
+                isLoading={isLoading}
+                error={isError ? error?.message ?? "" : null}
+              />
+            </section>
           </TabsContent>
         </Tabs>
       </main>
-      <footer className="border-t bg-card/80 backdrop-blur-xl print-container">
+      <footer className="border-t bg-card/80 backdrop-blur-xl print-container print:border-primary/20 print:bg-gradient-to-r print:from-primary/10 print:to-transparent">
         <div className="container mx-auto px-6 py-4 max-w-7xl text-center">
-          <p className="text-base font-semibold text-muted-foreground">Powered by Inicio Tech Team &copy; 2025</p>
+          <p className="text-base font-semibold text-muted-foreground print:text-slate-600">
+            Powered by Inicio Tech Team &copy; 2025
+          </p>
         </div>
       </footer>
     </div>
