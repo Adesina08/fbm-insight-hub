@@ -130,3 +130,27 @@ All colors MUST be HSL.
     }
   }
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .print-page {
+    min-height: auto !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  .print-container {
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    position: static !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
