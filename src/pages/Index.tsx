@@ -1,4 +1,4 @@
-import { type ChangeEvent, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Users, Target, Zap, Network, Loader2 } from "lucide-react";
 import DashboardOverview, { type DashboardOverviewMetadata } from "@/components/dashboard/DashboardOverview";
@@ -19,6 +19,122 @@ import type { DashboardAnalytics } from "@/lib/googleSheets";
 
 type DataMode = "live" | "upload";
 
+interface ComputeSyncStatusOptions {
+  dataMode: DataMode | null;
+  errorMessage: string | null;
+  isError: boolean;
+  isFetching: boolean;
+  isLoading: boolean;
+  isProcessingUpload: boolean;
+  uploadError: string | null;
+  uploadedAnalytics: DashboardAnalytics | null;
+  uploadedFile: File | null;
+  uploadSummary: { rowCount: number } | null;
+}
+
+const computeSyncStatus = ({
+  dataMode,
+  errorMessage,
+  isError,
+  isFetching,
+  isLoading,
+  isProcessingUpload,
+  uploadError,
+  uploadedAnalytics,
+  uploadedFile,
+  uploadSummary,
+}: ComputeSyncStatusOptions): string => {
+  if (!dataMode) {
+    return "Select a data source to begin";
+  }
+
+  if (dataMode === "upload") {
+    if (isProcessingUpload) {
+      return "Processing uploaded dataset…";
+    }
+    if (uploadError) {
+      return `Upload error: ${uploadError}`;
+    }
+    if (uploadedAnalytics && uploadSummary?.rowCount) {
+      return `Using uploaded dataset (${uploadSummary.rowCount} records)`;
+    }
+    return uploadedFile ? `Using uploaded file: ${uploadedFile.name}` : "Awaiting uploaded dataset";
+  }
+
+  if (isLoading) return "Connecting to data source…";
+  if (isFetching) return "Syncing latest submissions…";
+  if (isError) return errorMessage ?? "Sync error";
+  return "Live data from connected source";
+};
+
+interface ComputeOverviewMetadataOptions {
+  dataMode: DataMode | null;
+  isProcessingUpload: boolean;
+  uploadSummary: { rowCount: number } | null;
+  uploadedAnalytics: DashboardAnalytics | null;
+  uploadedFile: File | null;
+}
+
+const computeOverviewMetadata = ({
+  dataMode,
+  isProcessingUpload,
+  uploadSummary,
+  uploadedAnalytics,
+  uploadedFile,
+}: ComputeOverviewMetadataOptions): DashboardOverviewMetadata | null | undefined => {
+  if (!dataMode) {
+    return null;
+  }
+
+  if (dataMode === "upload") {
+    if (uploadedAnalytics && uploadSummary?.rowCount) {
+      return {
+        primary: `Uploaded dataset analysed (${new Intl.NumberFormat().format(uploadSummary.rowCount)} records)`,
+        secondary: uploadedFile ? `Source file: ${uploadedFile.name}` : undefined,
+      } satisfies DashboardOverviewMetadata;
+    }
+
+    if (uploadedFile) {
+      return {
+        primary: `Source file: ${uploadedFile.name}`,
+        secondary: isProcessingUpload ? "Processing uploaded dataset…" : "Awaiting dataset parsing.",
+      } satisfies DashboardOverviewMetadata;
+    }
+
+    return {
+      primary: "Awaiting uploaded dataset",
+    } satisfies DashboardOverviewMetadata;
+  }
+
+  return undefined;
+};
+
+interface ComputeIsPdfDisabledOptions {
+  analytics: DashboardAnalytics | null;
+  isFetching: boolean;
+  isLiveMode: boolean;
+  isLoading: boolean;
+  isProcessingUpload: boolean;
+}
+
+const computeIsPdfDisabled = ({
+  analytics,
+  isFetching,
+  isLiveMode,
+  isLoading,
+  isProcessingUpload,
+}: ComputeIsPdfDisabledOptions): boolean => {
+  if (!analytics) {
+    return true;
+  }
+
+  if (isLiveMode) {
+    return isLoading || isFetching;
+  }
+
+  return isProcessingUpload;
+};
+
 const Index = () => {
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -35,29 +151,9 @@ const Index = () => {
   });
   const reportRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const syncStatus = useMemo(() => {
-    if (!dataMode) {
-      return "Select a data source to begin";
-    }
-    if (dataMode === "upload") {
-      if (isProcessingUpload) {
-        return "Processing uploaded dataset…";
-      }
-      if (uploadError) {
-        return `Upload error: ${uploadError}`;
-      }
-      if (uploadedAnalytics && uploadSummary?.rowCount) {
-        return `Using uploaded dataset (${uploadSummary.rowCount} records)`;
-      }
-      return uploadedFile ? `Using uploaded file: ${uploadedFile.name}` : "Awaiting uploaded dataset";
-    }
-    if (isLoading) return "Connecting to data source…";
-    if (isFetching) return "Syncing latest submissions…";
-    if (isError) return error?.message ?? "Sync error";
-    return "Live data from connected source";
-  }, [
+  const syncStatus = computeSyncStatus({
     dataMode,
-    error?.message,
+    errorMessage: error?.message ?? null,
     isError,
     isFetching,
     isLoading,
@@ -65,49 +161,18 @@ const Index = () => {
     uploadError,
     uploadedAnalytics,
     uploadedFile,
-    uploadSummary?.rowCount,
-  ]);
+    uploadSummary,
+  });
 
-  const analytics = useMemo(() => {
-    if (isLiveMode) {
-      return data ?? null;
-    }
-    return uploadedAnalytics;
-  }, [data, isLiveMode, uploadedAnalytics]);
+  const analytics: DashboardAnalytics | null = isLiveMode ? data ?? null : uploadedAnalytics;
 
-  const overviewMetadata = useMemo<DashboardOverviewMetadata | null | undefined>(() => {
-    if (!dataMode) {
-      return null;
-    }
-
-    if (dataMode === "upload") {
-      if (uploadedAnalytics && uploadSummary?.rowCount) {
-        return {
-          primary: `Uploaded dataset analysed (${new Intl.NumberFormat().format(uploadSummary.rowCount)} records)`,
-          secondary: uploadedFile ? `Source file: ${uploadedFile.name}` : undefined,
-        } satisfies DashboardOverviewMetadata;
-      }
-
-      if (uploadedFile) {
-        return {
-          primary: `Source file: ${uploadedFile.name}`,
-          secondary: isProcessingUpload ? "Processing uploaded dataset…" : "Awaiting dataset parsing.",
-        } satisfies DashboardOverviewMetadata;
-      }
-
-      return {
-        primary: "Awaiting uploaded dataset",
-      } satisfies DashboardOverviewMetadata;
-    }
-
-    return undefined;
-  }, [
+  const overviewMetadata = computeOverviewMetadata({
     dataMode,
     isProcessingUpload,
-    uploadSummary?.rowCount,
+    uploadSummary,
     uploadedAnalytics,
     uploadedFile,
-  ]);
+  });
 
   const handleConfirmMode = () => {
     if (pendingMode === "live" || pendingMode === "upload") {
@@ -163,15 +228,13 @@ const Index = () => {
     fileInputRef.current?.click();
   };
 
-  const isPdfDisabled = useMemo(() => {
-    if (!analytics) {
-      return true;
-    }
-    if (isLiveMode) {
-      return isLoading || isFetching;
-    }
-    return isProcessingUpload;
-  }, [analytics, isFetching, isLiveMode, isLoading, isProcessingUpload]);
+  const isPdfDisabled = computeIsPdfDisabled({
+    analytics,
+    isFetching,
+    isLiveMode,
+    isLoading,
+    isProcessingUpload,
+  });
 
   const isAnalyticsLoading = isLiveMode ? (isLoading || isFetching) : isProcessingUpload;
   const analyticsError = isLiveMode && isError ? error?.message ?? "Unable to load analytics data." : null;
