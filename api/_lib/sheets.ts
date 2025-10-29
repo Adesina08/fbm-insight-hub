@@ -1,9 +1,5 @@
 import { createSign } from "node:crypto";
 
-import { ensureFetchPolyfill } from "./polyfills";
-
-ensureFetchPolyfill();
-
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const TOKEN_LIFETIME_SECONDS = 3600;
 

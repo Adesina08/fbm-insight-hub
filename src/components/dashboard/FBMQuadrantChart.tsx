@@ -1,5 +1,18 @@
 import { useState } from "react";
-import Plot from "react-plotly.js";
+import {
+  CartesianGrid,
+  Legend,
+  ReferenceArea,
+  ReferenceLine,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+  ZAxis,
+  type TooltipProps,
+} from "recharts";
 import { Target, Info } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +26,14 @@ interface FBMQuadrantChartProps {
   error?: string | null;
 }
 
+interface ChartPoint extends ScatterPoint {
+  x: number;
+  y: number;
+  size: number;
+  overlayValue: number | null;
+  segment: "Current User" | "Non-User";
+}
+
 const LoadingState = () => (
   <div className="space-y-4">
     <Skeleton className="h-6 w-48" />
@@ -21,17 +42,19 @@ const LoadingState = () => (
 );
 
 const EmptyState = () => (
-  <div className="p-6 text-sm text-muted-foreground bg-muted/20 rounded-lg">
+  <div className="rounded-lg bg-muted/20 p-6 text-sm text-muted-foreground">
     Google Sheet rows must include motivation, ability, and current use indicators to render the quadrant plot.
   </div>
 );
+
+const createMarkerSize = (value: number | null) => 6 + (value ?? 0) * 3;
 
 const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChartProps) => {
   const [overlayType, setOverlayType] = useState<"norms" | "system">("norms");
 
   if (isLoading) {
     return (
-      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
+      <Card className="border-0 bg-card/50 shadow-xl backdrop-blur-sm">
         <CardHeader>
           <Skeleton className="h-6 w-40" />
         </CardHeader>
@@ -44,12 +67,10 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
 
   if (error) {
     return (
-      <Card className="border-0 shadow-xl bg-destructive/10 border-destructive/30">
+      <Card className="border-0 border-destructive/30 bg-destructive/10 shadow-xl">
         <CardHeader>
           <CardTitle className="text-destructive">Unable to load FBM quadrant chart</CardTitle>
-          <CardDescription className="text-destructive">
-            {error}
-          </CardDescription>
+          <CardDescription className="text-destructive">{error}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -57,15 +78,15 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
 
   if (!points || points.length === 0) {
     return (
-      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
+      <Card className="border-0 bg-card/50 shadow-xl backdrop-blur-sm">
         <CardHeader>
           <div className="flex items-start gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
-              <Target className="w-6 h-6 text-white" />
+            <div className="rounded-xl bg-gradient-to-br from-primary to-chart-3 p-3 shadow-lg">
+              <Target className="h-6 w-6 text-white" />
             </div>
             <div>
               <CardTitle className="text-2xl">FBM Quadrant Analysis</CardTitle>
-              <CardDescription className="text-base mt-1">
+              <CardDescription className="mt-1 text-base">
                 Motivation vs Ability scatter plot with behavior outcomes
               </CardDescription>
             </div>
@@ -81,21 +102,56 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
   const users = points.filter((point) => point.currentUse);
   const nonUsers = points.filter((point) => !point.currentUse);
   const overlayLabel = overlayType === "norms" ? "Average Norms" : "System Readiness";
+  const overlayKey = overlayType === "norms" ? "norms" : "system";
 
-  const createMarkerSize = (value: number | null) => 6 + (value ?? 0) * 3;
+  const mapPoint = (point: ScatterPoint, segment: ChartPoint["segment"]): ChartPoint => {
+    const overlayValue = point[overlayKey];
+    return {
+      ...point,
+      x: point.ability,
+      y: point.motivation,
+      size: createMarkerSize(overlayValue),
+      overlayValue,
+      segment,
+    };
+  };
+
+  const userPoints = users.map((point) => mapPoint(point, "Current User"));
+  const nonUserPoints = nonUsers.map((point) => mapPoint(point, "Non-User"));
+
+  const renderTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    if (!active || !payload || payload.length === 0) {
+      return null;
+    }
+
+    const data = payload[0].payload as ChartPoint;
+
+    return (
+      <div className="rounded-lg border border-border bg-background/95 p-3 text-sm shadow-lg">
+        <p className="font-medium text-foreground">{data.segment}</p>
+        <p className="text-muted-foreground">Ability: {data.ability.toFixed(1)}</p>
+        <p className="text-muted-foreground">Motivation: {data.motivation.toFixed(1)}</p>
+        {typeof data.overlayValue === "number" && (
+          <p className="text-muted-foreground">
+            {overlayLabel}: {data.overlayValue.toFixed(1)}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
+      <Card className="border-0 bg-card/50 shadow-xl backdrop-blur-sm">
         <CardHeader>
           <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
-                <Target className="w-6 h-6 text-white" />
+            <div className="flex flex-1 items-start gap-3">
+              <div className="rounded-xl bg-gradient-to-br from-primary to-chart-3 p-3 shadow-lg">
+                <Target className="h-6 w-6 text-white" />
               </div>
               <div>
                 <CardTitle className="text-2xl">FBM Quadrant Analysis</CardTitle>
-                <CardDescription className="text-base mt-1">
+                <CardDescription className="mt-1 text-base">
                   Motivation vs Ability scatter plot with behavior outcomes
                 </CardDescription>
               </div>
@@ -112,227 +168,120 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
           </div>
         </CardHeader>
         <CardContent>
-          <div className="w-full h-[520px] md:h-[580px]">
-            <Plot
-              data={[
-                {
-                  x: users.map((d) => d.ability),
-                  y: users.map((d) => d.motivation),
-                  mode: "markers" as const,
-                  type: "scatter" as const,
-                  name: "Current Users",
-                  marker: {
-                    size: users.map((d) =>
-                      overlayType === "norms"
-                        ? createMarkerSize(d.norms)
-                        : createMarkerSize(d.system)
-                    ),
-                    color: "#22c55e",
-                    opacity: 0.7,
-                    line: { color: "#16a34a", width: 1 },
-                  },
-                  hovertemplate:
-                    `<b>Current User</b><br>` +
-                    `Ability: %{x:.1f}<br>` +
-                    `Motivation: %{y:.1f}<br>` +
-                    `${overlayLabel}: %{marker.size:.1f}<br>` +
-                    "<extra></extra>",
-                },
-                {
-                  x: nonUsers.map((d) => d.ability),
-                  y: nonUsers.map((d) => d.motivation),
-                  mode: "markers" as const,
-                  type: "scatter" as const,
-                  name: "Non-Users",
-                  marker: {
-                    size: nonUsers.map((d) =>
-                      overlayType === "norms"
-                        ? createMarkerSize(d.norms)
-                        : createMarkerSize(d.system)
-                    ),
-                    color: "#a855f7",
-                    opacity: 0.6,
-                    line: { color: "#9333ea", width: 1 },
-                  },
-                  hovertemplate:
-                    `<b>Non-User</b><br>` +
-                    `Ability: %{x:.1f}<br>` +
-                    `Motivation: %{y:.1f}<br>` +
-                    `${overlayLabel}: %{marker.size:.1f}<br>` +
-                    "<extra></extra>",
-                },
-              ]}
-              layout={{
-                width: undefined,
-                height: undefined,
-                autosize: true,
-                paper_bgcolor: "rgba(0,0,0,0)",
-                plot_bgcolor: "rgba(248,250,252,0.6)",
-                hovermode: "closest",
-                font: { family: "inherit" },
-                hoverlabel: {
-                  bgcolor: "#111827",
-                  bordercolor: "#111827",
-                  font: { family: "inherit" },
-                },
-                xaxis: {
-                  title: { text: "Ability Score", font: { size: 16, family: "inherit" } },
-                  range: [0, 5.5],
-                  gridcolor: "#e2e8f0",
-                  gridwidth: 1,
-                  zeroline: true,
-                  zerolinecolor: "#9ca3af",
-                  tick0: 0,
-                  dtick: 1,
-                  tickfont: { family: "inherit", color: "#475569" },
-                },
-                yaxis: {
-                  title: { text: "Motivation Score", font: { size: 16, family: "inherit" } },
-                  range: [0, 5.5],
-                  gridcolor: "#e2e8f0",
-                  gridwidth: 1,
-                  zeroline: true,
-                  zerolinecolor: "#9ca3af",
-                  tick0: 0,
-                  dtick: 1,
-                  tickfont: { family: "inherit", color: "#475569" },
-                },
-                shapes: [
-                  {
-                    type: "line" as const,
-                    x0: 3, x1: 3,
-                    y0: 0, y1: 5.5,
-                    line: { color: "#6b7280", width: 2, dash: "dash" },
-                  },
-                  {
-                    type: "line" as const,
-                    x0: 0, x1: 5.5,
-                    y0: 3, y1: 3,
-                    line: { color: "#6b7280", width: 2, dash: "dash" },
-                  },
-                  {
-                    type: "rect" as const,
-                    x0: 0, x1: 3, y0: 0, y1: 3,
-                    fillcolor: "#ef4444",
-                    opacity: 0.08,
-                    layer: "below" as const,
-                    line: { width: 0 },
-                  },
-                  {
-                    type: "rect" as const,
-                    x0: 3, x1: 5.5, y0: 0, y1: 3,
-                    fillcolor: "#a855f7",
-                    opacity: 0.08,
-                    layer: "below" as const,
-                    line: { width: 0 },
-                  },
-                  {
-                    type: "rect" as const,
-                    x0: 0, x1: 3, y0: 3, y1: 5.5,
-                    fillcolor: "#22c55e",
-                    opacity: 0.08,
-                    layer: "below" as const,
-                    line: { width: 0 },
-                  },
-                  {
-                    type: "rect" as const,
-                    x0: 3, x1: 5.5, y0: 3, y1: 5.5,
-                    fillcolor: "#fde047",
-                    opacity: 0.08,
-                    layer: "below" as const,
-                    line: { width: 0 },
-                  },
-                ],
-                annotations: [
-                  {
-                    text: "Low Motivation<br>Low Ability",
-                    x: 1.5,
-                    y: 1.5,
-                    xref: "x",
-                    yref: "y",
-                    showarrow: false,
-                    font: { size: 14, color: "#1f2937", family: "inherit" },
-                    align: "center",
-                    bgcolor: "rgba(255,255,255,0.8)",
-                    borderpad: 6,
-                    bordercolor: "rgba(15,23,42,0.12)",
-                  },
-                  {
-                    text: "Low Motivation<br>High Ability",
-                    x: 4.2,
-                    y: 1.5,
-                    xref: "x",
-                    yref: "y",
-                    showarrow: false,
-                    font: { size: 14, color: "#312e81", family: "inherit" },
-                    align: "center",
-                    bgcolor: "rgba(255,255,255,0.85)",
-                    borderpad: 6,
-                    bordercolor: "rgba(79,70,229,0.18)",
-                  },
-                  {
-                    text: "High Motivation<br>Low Ability",
-                    x: 1.5,
-                    y: 4.2,
-                    xref: "x",
-                    yref: "y",
-                    showarrow: false,
-                    font: { size: 14, color: "#065f46", family: "inherit" },
-                    align: "center",
-                    bgcolor: "rgba(255,255,255,0.85)",
-                    borderpad: 6,
-                    bordercolor: "rgba(22,101,52,0.18)",
-                  },
-                  {
-                    text: "High Motivation<br>High Ability",
-                    x: 4.2,
-                    y: 4.2,
-                    xref: "x",
-                    yref: "y",
-                    showarrow: false,
-                    font: { size: 14, color: "#92400e", family: "inherit" },
-                    align: "center",
-                    bgcolor: "rgba(255,255,255,0.85)",
-                    borderpad: 6,
-                    bordercolor: "rgba(180,83,9,0.18)",
-                  },
-                ],
-                legend: {
-                  orientation: "h",
-                  yanchor: "bottom",
-                  y: 1.02,
-                  xanchor: "right",
-                  x: 1,
-                  font: { family: "inherit" },
-                  bgcolor: "rgba(255,255,255,0.9)",
-                  bordercolor: "rgba(148,163,184,0.4)",
-                  borderwidth: 1,
-                },
-                margin: { l: 60, r: 40, t: 40, b: 60 },
-              }}
-              config={{ displayModeBar: false, responsive: true }}
-              useResizeHandler
-              style={{ width: "100%", height: "100%" }}
-            />
+          <div className="relative h-[520px] w-full md:h-[580px]">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute left-[16%] top-[34%]">
+                <div className="rounded-lg bg-white/80 px-3 py-2 text-xs font-medium text-slate-800 shadow-sm">
+                  Low Motivation
+                  <br />
+                  Low Ability
+                </div>
+              </div>
+              <div className="absolute right-[14%] top-[34%]">
+                <div className="rounded-lg bg-white/85 px-3 py-2 text-xs font-medium text-indigo-900 shadow-sm">
+                  Low Motivation
+                  <br />
+                  High Ability
+                </div>
+              </div>
+              <div className="absolute bottom-[32%] left-[16%]">
+                <div className="rounded-lg bg-white/85 px-3 py-2 text-xs font-medium text-emerald-700 shadow-sm">
+                  High Motivation
+                  <br />
+                  Low Ability
+                </div>
+              </div>
+              <div className="absolute bottom-[32%] right-[14%]">
+                <div className="rounded-lg bg-white/85 px-3 py-2 text-xs font-medium text-amber-700 shadow-sm">
+                  High Motivation
+                  <br />
+                  High Ability
+                </div>
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 50, right: 40, bottom: 60, left: 60 }}>
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  domain={[0, 5.5]}
+                  tick={{ fill: "#475569", fontSize: 12 }}
+                  tickCount={6}
+                  label={{ value: "Ability Score", position: "bottom", offset: 25, style: { fill: "#0f172a", fontSize: 16 } }}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  domain={[0, 5.5]}
+                  tick={{ fill: "#475569", fontSize: 12 }}
+                  tickCount={6}
+                  label={{
+                    value: "Motivation Score",
+                    angle: -90,
+                    position: "left",
+                    offset: -40,
+                    style: { fill: "#0f172a", fontSize: 16 },
+                  }}
+                />
+                <ZAxis dataKey="size" type="number" range={[60, 220]} />
+                <ReferenceLine x={3} stroke="#6b7280" strokeDasharray="4 4" strokeWidth={2} />
+                <ReferenceLine y={3} stroke="#6b7280" strokeDasharray="4 4" strokeWidth={2} />
+                <ReferenceArea x1={0} x2={3} y1={0} y2={3} fill="#ef4444" fillOpacity={0.08} />
+                <ReferenceArea x1={3} x2={5.5} y1={0} y2={3} fill="#a855f7" fillOpacity={0.08} />
+                <ReferenceArea x1={0} x2={3} y1={3} y2={5.5} fill="#22c55e" fillOpacity={0.08} />
+                <ReferenceArea x1={3} x2={5.5} y1={3} y2={5.5} fill="#fde047" fillOpacity={0.1} />
+                <Tooltip cursor={{ strokeDasharray: "4 4" }} content={renderTooltip} />
+                <Legend
+                  verticalAlign="top"
+                  height={48}
+                  wrapperStyle={{
+                    top: 0,
+                    right: 40,
+                    padding: "6px 12px",
+                    backgroundColor: "rgba(255,255,255,0.9)",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(148,163,184,0.4)",
+                  }}
+                />
+                <Scatter
+                  name="Current Users"
+                  data={userPoints}
+                  fill="#22c55e"
+                  stroke="#16a34a"
+                  fillOpacity={0.7}
+                  legendType="circle"
+                />
+                <Scatter
+                  name="Non-Users"
+                  data={nonUserPoints}
+                  fill="#a855f7"
+                  stroke="#9333ea"
+                  fillOpacity={0.6}
+                  legendType="circle"
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm">
+      <Card className="border-0 bg-card/50 shadow-xl backdrop-blur-sm">
         <CardHeader>
           <div className="flex items-start gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-lg">
-              <Info className="w-6 h-6 text-white" />
+            <div className="rounded-xl bg-gradient-to-br from-primary to-chart-3 p-3 shadow-lg">
+              <Info className="h-6 w-6 text-white" />
             </div>
             <div>
               <CardTitle className="text-2xl">How to read this chart</CardTitle>
-              <CardDescription className="text-base mt-1">
+              <CardDescription className="mt-1 text-base">
                 Each dot represents an interview. Size reflects either social norms or system readiness scores.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-3">
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
             Use the overlay selector to switch between norms and system readiness. Larger markers indicate higher scores for the
             selected driver, helping you spot leverage points by quadrant.
