@@ -462,28 +462,23 @@ const DashboardOverview = ({
     setParityFilter(ALL_FILTER_VALUE);
   };
 
-  if (isLoading) {
-    return <LoadingState />;
-  }
+  const metadataContent: DashboardOverviewMetadata | null = useMemo(() => {
+    if (metadata !== undefined) {
+      return metadata;
+    }
 
-  if (error) {
-    return <ErrorState message={error} onRetry={onRetry} />;
-  }
+    return {
+      primary: `Last data sync: ${lastUpdatedLabel(lastUpdated)}`,
+      secondary: "Data refreshes automatically every minute.",
+    };
+  }, [lastUpdated, metadata]);
 
-  if (!stats || !quadrants) {
-    return <ErrorState message="No submissions are available yet." onRetry={onRetry} />;
-  }
+  const baseCards: KpiCard[] = useMemo(() => {
+    if (!stats) {
+      return [];
+    }
 
-  const metadataContent: DashboardOverviewMetadata | null =
-    metadata === undefined
-      ? {
-          primary: `Last data sync: ${lastUpdatedLabel(lastUpdated)}`,
-          secondary: "Data refreshes automatically every minute.",
-        }
-      : metadata;
-
-  const baseCards: KpiCard[] = useMemo(() => (
-    [
+    return [
       {
         title: "Total Respondents",
         value: formatNumber(stats.totalRespondents.value),
@@ -516,8 +511,8 @@ const DashboardOverview = ({
         suffix: " / 5",
         gradient: "from-chart-4 to-chart-4/60",
       },
-    ]
-  ), [stats]);
+    ];
+  }, [stats]);
 
   const descriptiveCards: KpiCard[] = useMemo(() => {
     const items: KpiCard[] = [];
@@ -637,6 +632,18 @@ const DashboardOverview = ({
     () => [...baseCards, ...descriptiveCards],
     [baseCards, descriptiveCards],
   );
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return <ErrorState message={error} onRetry={onRetry} />;
+  }
+
+  if (!stats || !quadrants) {
+    return <ErrorState message="No submissions are available yet." onRetry={onRetry} />;
+  }
 
   return (
     <div className="space-y-8 animate-fade-in print:space-y-10">
