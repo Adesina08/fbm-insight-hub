@@ -19,6 +19,8 @@ import {
   BarChart3,
   Network,
   UserCheck,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   DESCRIPTIVE_UNKNOWN_VALUE,
@@ -638,8 +640,55 @@ const DashboardOverview = ({
     [baseCards, descriptiveCards],
   );
 
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  const chunkedCards = useMemo(() => {
+    const chunkSize = 4;
+    const chunks: KpiCard[][] = [];
+
+    for (let index = 0; index < cards.length; index += chunkSize) {
+      chunks.push(cards.slice(index, index + chunkSize));
+    }
+
+    return chunks.length > 0 ? chunks : [[]];
+  }, [cards]);
+
+  const hasMultipleSlides = chunkedCards.length > 1;
+  const safeActiveSlide = Math.min(activeSlide, chunkedCards.length - 1);
+  const visibleCards = chunkedCards[safeActiveSlide] ?? [];
+
+  useEffect(() => {
+    if (activeSlide !== safeActiveSlide) {
+      setActiveSlide(safeActiveSlide);
+    }
+  }, [activeSlide, safeActiveSlide]);
+
   return (
     <div className="space-y-8 animate-fade-in print:space-y-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
+        {metadataContent ? (
+          <div>
+            <p className="text-sm text-muted-foreground print:text-slate-600">
+              {metadataContent.primary}
+            </p>
+            {metadataContent.secondary ? (
+              <p className="text-xs text-muted-foreground print:text-slate-500">{metadataContent.secondary}</p>
+            ) : null}
+          </div>
+        ) : null}
+        {onRetry ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="flex items-center gap-2 print:hidden"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Refresh now
+          </Button>
+        ) : null}
+      </div>
+
       {descriptiveData ? (
         <div className="mx-auto w-full max-w-6xl space-y-4 rounded-xl border border-border/40 bg-card/50 p-4 shadow-sm print:hidden">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -743,32 +792,39 @@ const DashboardOverview = ({
         </div>
       ) : null}
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
-        {metadataContent ? (
-          <div>
-            <p className="text-sm text-muted-foreground print:text-slate-600">
-              {metadataContent.primary}
-            </p>
-            {metadataContent.secondary ? (
-              <p className="text-xs text-muted-foreground print:text-slate-500">{metadataContent.secondary}</p>
-            ) : null}
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-3 print:hidden">
+        {hasMultipleSlides ? (
+          <div className="flex items-center gap-3 rounded-full border border-border/60 bg-card/60 px-3 py-1 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">KPI set {activeSlide + 1}</span>
+            <span className="text-muted-foreground">of {chunkedCards.length}</span>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setActiveSlide((current) => Math.max(0, current - 1))}
+                disabled={activeSlide === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setActiveSlide((current) => Math.min(chunkedCards.length - 1, current + 1))}
+                disabled={activeSlide >= chunkedCards.length - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        ) : null}
-        {onRetry ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRetry}
-            className="flex items-center gap-2 print:hidden"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refresh now
-          </Button>
         ) : null}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 print:grid-cols-2 print:gap-5">
-        {cards.map((card) => {
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 print:hidden">
+        {visibleCards.map((card) => {
           const Icon = card.trendIcon;
           return (
             <Card
@@ -793,6 +849,35 @@ const DashboardOverview = ({
                     <span className="text-base font-medium text-muted-foreground print:text-slate-600">{card.suffix}</span>
                   ) : null}
                 </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+      <div className="hidden print:grid print:grid-cols-2 print:gap-5">
+        {cards.map((card) => {
+          const Icon = card.trendIcon;
+          return (
+            <Card
+              key={`${card.title}-print`}
+              className="group relative overflow-hidden print:border print:border-primary/20 print:bg-white/95"
+            >
+              <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-20`} />
+              <CardHeader className="relative">
+                <CardTitle className="flex items-center gap-3 text-base">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                    <Icon className="h-4 w-4 text-primary" />
+                  </span>
+                  {card.title}
+                </CardTitle>
+                {card.suffix ? (
+                  <CardDescription className="text-xs text-muted-foreground">
+                    {card.suffix}
+                  </CardDescription>
+                ) : null}
+              </CardHeader>
+              <CardContent className="relative">
+                <p className="text-3xl font-semibold tracking-tight">{card.value}</p>
               </CardContent>
             </Card>
           );
