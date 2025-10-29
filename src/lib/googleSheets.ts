@@ -12,6 +12,12 @@ import {
   type StatWithChange,
   type CountWithChange,
   type QuadrantId,
+  type DescriptiveAnalytics,
+  type DescriptiveSubmission,
+  type DescriptiveFilterOption,
+  type MotivationSubdomainId,
+  type AbilitySubdomainId,
+  DESCRIPTIVE_UNKNOWN_VALUE,
 } from "./analytics";
 
 export type {
@@ -26,7 +32,14 @@ export type {
   ModelSummary,
   StatWithChange,
   CountWithChange,
+  DescriptiveAnalytics,
+  DescriptiveSubmission,
+  DescriptiveFilterOption,
+  MotivationSubdomainId,
+  AbilitySubdomainId,
 } from "./analytics";
+
+export { DESCRIPTIVE_UNKNOWN_VALUE } from "./analytics";
 
 const DEFAULT_SHEETS_DATA_URL = "/api/sheets-data";
 const DEFAULT_SHEETS_METADATA_URL = "/api/sheets-metadata";

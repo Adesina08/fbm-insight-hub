@@ -14,6 +14,11 @@ export const DEFAULT_FIELD_MAP = {
   promptFacilitator: "prompt_facilitator",
   promptSpark: "prompt_spark",
   promptSignal: "prompt_signal",
+  age: "A5",
+  maritalStatus: "A6",
+  educationLevel: "A7",
+  location: "A3",
+  parity: "parity",
 } as const;
 
 export type FieldKey = keyof typeof DEFAULT_FIELD_MAP;
@@ -242,6 +247,37 @@ const STRONG_NEGATIVE_PHRASES = [
   "very poorly",
 ];
 
+const CATEGORY_NULL_TERMS = new Set([
+  "n a",
+  "na",
+  "none",
+  "not applicable",
+  "unknown",
+  "unsure",
+  "missing",
+  "prefer not to say",
+  "refused",
+  "blank",
+  "no response",
+  "undisclosed",
+]);
+
+export const DESCRIPTIVE_UNKNOWN_VALUE = "__unknown__";
+
+const AGE_BUCKET_DEFINITIONS = [
+  { value: "under_20", label: "Under 20", matches: (age: number | null) => age != null && age < 20 },
+  { value: "20_24", label: "20–24", matches: (age: number | null) => age != null && age >= 20 && age <= 24 },
+  { value: "25_29", label: "25–29", matches: (age: number | null) => age != null && age >= 25 && age <= 29 },
+  { value: "30_34", label: "30–34", matches: (age: number | null) => age != null && age >= 30 && age <= 34 },
+  { value: "35_plus", label: "35 and above", matches: (age: number | null) => age != null && age >= 35 },
+] as const;
+
+const PARITY_BUCKET_DEFINITIONS = [
+  { value: "zero", label: "0 children", matches: (parity: number | null) => parity === 0 },
+  { value: "one_two", label: "1–2 children", matches: (parity: number | null) => parity != null && parity >= 1 && parity <= 2 },
+  { value: "three_plus", label: "3+ children", matches: (parity: number | null) => parity != null && parity >= 3 },
+] as const;
+
 function normalizeTextValue(value: string): string {
   return value
     .toLowerCase()
@@ -457,6 +493,18 @@ function averageNumbers(values: Array<number | null | undefined>): number | null
   return sum / filtered.length;
 }
 
+export type MotivationSubdomainId = "C1" | "C2" | "C3" | "C4";
+
+export type AbilitySubdomainId = "D1" | "D2" | "D3" | "D4" | "D5" | "D6";
+
+export interface RespondentProfile {
+  age: number | null;
+  maritalStatus: string | null;
+  educationLevel: string | null;
+  location: string | null;
+  parity: number | null;
+}
+
 interface DerivedMetrics {
   motivation?: number | null;
   ability?: number | null;
@@ -467,6 +515,9 @@ interface DerivedMetrics {
   promptSpark?: number | null;
   promptSignal?: number | null;
   currentUse?: boolean | null;
+  motivationItems?: Partial<Record<MotivationSubdomainId, number | null>>;
+  abilityItems?: Partial<Record<AbilitySubdomainId, number | null>>;
+  profile?: RespondentProfile;
 }
 
 function computePromptExposure(
@@ -518,21 +569,25 @@ function computePromptExposure(
 }
 
 function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
-  const motivation = averageNumbers([
-    parseLikertScore(getValueForQuestion(record, "C1")),
-    parseLikertScore(getValueForQuestion(record, "C2")),
-    parseLikertScore(getValueForQuestion(record, "C3")),
-    parseLikertScore(getValueForQuestion(record, "C4")),
-  ]);
+  const motivationItems: Partial<Record<MotivationSubdomainId, number | null>> = {
+    C1: parseLikertScore(getValueForQuestion(record, "C1")),
+    C2: parseLikertScore(getValueForQuestion(record, "C2")),
+    C3: parseLikertScore(getValueForQuestion(record, "C3")),
+    C4: parseLikertScore(getValueForQuestion(record, "C4")),
+  };
 
-  const ability = averageNumbers([
-    parseLikertScore(getValueForQuestion(record, "D1")),
-    parseLikertScore(getValueForQuestion(record, "D2")),
-    parseLikertScore(getValueForQuestion(record, "D3")),
-    parseLikertScore(getValueForQuestion(record, "D4")),
-    parseLikertScore(getValueForQuestion(record, "D5")),
-    parseLikertScore(getValueForQuestion(record, "D6")),
-  ]);
+  const abilityItems: Partial<Record<AbilitySubdomainId, number | null>> = {
+    D1: parseLikertScore(getValueForQuestion(record, "D1")),
+    D2: parseLikertScore(getValueForQuestion(record, "D2")),
+    D3: parseLikertScore(getValueForQuestion(record, "D3")),
+    D4: parseLikertScore(getValueForQuestion(record, "D4")),
+    D5: parseLikertScore(getValueForQuestion(record, "D5")),
+    D6: parseLikertScore(getValueForQuestion(record, "D6")),
+  };
+
+  const motivation = averageNumbers(Object.values(motivationItems));
+
+  const ability = averageNumbers(Object.values(abilityItems));
 
   const descriptiveNorms = parseLikertScore(getValueForQuestion(record, "F1"));
   const injunctiveNorms = parseLikertScore(getValueForQuestion(record, "F2"));
@@ -576,6 +631,19 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     }
   }
 
+  const profile: RespondentProfile = {
+    age: parseNumber(getValueForQuestion(record, "A5")),
+    maritalStatus: parseString(getValueForQuestion(record, "A6")),
+    educationLevel: parseString(getValueForQuestion(record, "A7")),
+    location: parseString(getValueForQuestion(record, "A3")),
+    parity: parseNumber(
+      getValueForTokens(record, ["parity"])
+        ?? getValueForTokens(record, ["number", "children"])
+        ?? getValueForTokens(record, ["children", "ever", "born"])
+        ?? getValueForQuestion(record, "parity"),
+    ),
+  };
+
   return {
     motivation,
     ability,
@@ -586,6 +654,9 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     promptSpark: sparkExposure ?? promptLikelihood ?? null,
     promptSignal: signalExposure ?? promptLikelihood ?? null,
     currentUse,
+    motivationItems,
+    abilityItems,
+    profile,
   };
 }
 
@@ -656,6 +727,31 @@ const FIELD_TOKEN_HINTS: Record<FieldKey, string[][]> = {
     ["signal", "prompt"],
     ["signal"],
   ],
+  age: [
+    ["age"],
+    ["respondent", "age"],
+  ],
+  maritalStatus: [
+    ["marital", "status"],
+    ["marital"],
+    ["relationship", "status"],
+  ],
+  educationLevel: [
+    ["education"],
+    ["education", "level"],
+    ["school", "level"],
+  ],
+  location: [
+    ["location"],
+    ["place", "residence"],
+    ["community"],
+    ["ward"],
+  ],
+  parity: [
+    ["parity"],
+    ["number", "children"],
+    ["children", "ever", "born"],
+  ],
 } as const;
 
 export type QuadrantId =
@@ -677,6 +773,9 @@ export interface AnalyticsSubmission {
   currentUse: boolean | null;
   submissionTime?: string;
   quadrant?: QuadrantId;
+  profile: RespondentProfile;
+  motivationItems: Partial<Record<MotivationSubdomainId, number | null>>;
+  abilityItems: Partial<Record<AbilitySubdomainId, number | null>>;
 }
 
 export interface StatWithChange {
@@ -709,6 +808,45 @@ export interface ScatterPoint {
   currentUse: boolean;
   norms: number | null;
   system: number | null;
+}
+
+export interface DescriptiveCategoryValue {
+  value: string;
+  label: string;
+}
+
+export interface DescriptiveSubmission {
+  id: string;
+  age: number | null;
+  ageBucket: string | null;
+  maritalStatus: DescriptiveCategoryValue | null;
+  educationLevel: DescriptiveCategoryValue | null;
+  location: DescriptiveCategoryValue | null;
+  parity: number | null;
+  parityBucket: string | null;
+  motivationItems: Partial<Record<MotivationSubdomainId, number | null>>;
+  abilityItems: Partial<Record<AbilitySubdomainId, number | null>>;
+  descriptiveNorms: number | null;
+  injunctiveNorms: number | null;
+}
+
+export interface DescriptiveFilterOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface DescriptiveAnalyticsFilters {
+  age: DescriptiveFilterOption[];
+  maritalStatus: DescriptiveFilterOption[];
+  educationLevel: DescriptiveFilterOption[];
+  location: DescriptiveFilterOption[];
+  parity: DescriptiveFilterOption[];
+}
+
+export interface DescriptiveAnalytics {
+  submissions: DescriptiveSubmission[];
+  filters: DescriptiveAnalyticsFilters;
 }
 
 export interface SegmentSummary {
@@ -762,6 +900,7 @@ export interface DashboardAnalytics {
   promptEffectiveness: PromptEffectivenessRow[];
   regression: RegressionInsight[];
   modelSummary: ModelSummary[];
+  descriptive: DescriptiveAnalytics;
 }
 
 export interface RawSubmission extends Record<string, unknown> {
@@ -894,6 +1033,36 @@ export function normalizeSubmissions(
       parseNumber(lookupFieldValue(normalizedRecord, "promptSignal", fieldMap))
         ?? derived.promptSignal ?? null;
 
+    const age =
+      parseNumber(lookupFieldValue(normalizedRecord, "age", fieldMap)) ?? derived.profile?.age ?? null;
+    const maritalStatus =
+      parseString(lookupFieldValue(normalizedRecord, "maritalStatus", fieldMap))
+        ?? derived.profile?.maritalStatus ?? null;
+    const educationLevel =
+      parseString(lookupFieldValue(normalizedRecord, "educationLevel", fieldMap))
+        ?? derived.profile?.educationLevel ?? null;
+    const location =
+      parseString(lookupFieldValue(normalizedRecord, "location", fieldMap))
+        ?? derived.profile?.location ?? null;
+    const parity =
+      parseNumber(lookupFieldValue(normalizedRecord, "parity", fieldMap)) ?? derived.profile?.parity ?? null;
+
+    const motivationItems: Partial<Record<MotivationSubdomainId, number | null>> = {
+      C1: derived.motivationItems?.C1 ?? null,
+      C2: derived.motivationItems?.C2 ?? null,
+      C3: derived.motivationItems?.C3 ?? null,
+      C4: derived.motivationItems?.C4 ?? null,
+    };
+
+    const abilityItems: Partial<Record<AbilitySubdomainId, number | null>> = {
+      D1: derived.abilityItems?.D1 ?? null,
+      D2: derived.abilityItems?.D2 ?? null,
+      D3: derived.abilityItems?.D3 ?? null,
+      D4: derived.abilityItems?.D4 ?? null,
+      D5: derived.abilityItems?.D5 ?? null,
+      D6: derived.abilityItems?.D6 ?? null,
+    };
+
     const submissionTime = toISODate(
       typeof item._submission_time === "string"
         ? item._submission_time
@@ -920,6 +1089,15 @@ export function normalizeSubmissions(
       promptSpark,
       promptSignal,
       submissionTime,
+      profile: {
+        age,
+        maritalStatus,
+        educationLevel,
+        location,
+        parity,
+      },
+      motivationItems,
+      abilityItems,
     };
 
     normalized.quadrant = computeQuadrant(normalized.motivation, normalized.ability);
@@ -1099,6 +1277,40 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
     },
   } satisfies DashboardAnalytics["stats"];
 
+  const descriptiveSubmissions: DescriptiveSubmission[] = submissions.map((submission) => {
+    const maritalStatus = normalizeCategoryValue(submission.profile.maritalStatus);
+    const educationLevel = normalizeCategoryValue(submission.profile.educationLevel);
+    const location = normalizeCategoryValue(submission.profile.location);
+    const ageBucket = determineBucketValue(submission.profile.age, AGE_BUCKET_DEFINITIONS);
+    const parityBucket = determineBucketValue(submission.profile.parity, PARITY_BUCKET_DEFINITIONS);
+
+    return {
+      id: submission.id,
+      age: submission.profile.age,
+      ageBucket,
+      maritalStatus,
+      educationLevel,
+      location,
+      parity: submission.profile.parity,
+      parityBucket,
+      motivationItems: submission.motivationItems,
+      abilityItems: submission.abilityItems,
+      descriptiveNorms: submission.descriptiveNorms,
+      injunctiveNorms: submission.injunctiveNorms,
+    } satisfies DescriptiveSubmission;
+  });
+
+  const descriptive: DescriptiveAnalytics = {
+    submissions: descriptiveSubmissions,
+    filters: {
+      age: buildAgeFilterOptions(descriptiveSubmissions),
+      maritalStatus: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.maritalStatus)),
+      educationLevel: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.educationLevel)),
+      location: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.location)),
+      parity: buildParityFilterOptions(descriptiveSubmissions),
+    },
+  } satisfies DescriptiveAnalytics;
+
   return {
     lastUpdated,
     stats,
@@ -1108,6 +1320,7 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
     promptEffectiveness,
     regression,
     modelSummary: computeModelSummary(submissions, quadrants),
+    descriptive,
   };
 }
 
@@ -1117,6 +1330,18 @@ function parseNumber(value: unknown): number | null {
   if (typeof value === "string") {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : null;
+  }
+  return null;
+}
+
+function parseString(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
   }
   return null;
 }
@@ -1149,6 +1374,103 @@ function parseBoolean(value: unknown): boolean | null {
     if (/\busing\b/.test(normalized) && !/\bnot\b/.test(normalized)) return true;
   }
   return null;
+}
+
+function normalizeCategoryValue(value: string | null | undefined): DescriptiveCategoryValue | null {
+  const parsed = parseString(value);
+  if (!parsed) return null;
+  const trimmed = parsed.replace(/\s+/g, " ").trim();
+  if (!trimmed) return null;
+
+  const normalized = normalizeTextValue(trimmed);
+  if (normalized && CATEGORY_NULL_TERMS.has(normalized)) {
+    return null;
+  }
+
+  const valueKey = normalizeKeyName(trimmed) || normalized.replace(/\s+/g, "_") || trimmed.toLowerCase();
+
+  return {
+    value: valueKey,
+    label: trimmed,
+  } satisfies DescriptiveCategoryValue;
+}
+
+function determineBucketValue(
+  value: number | null,
+  definitions: readonly { value: string; matches: (input: number | null) => boolean }[],
+): string {
+  if (value == null || Number.isNaN(value)) {
+    return DESCRIPTIVE_UNKNOWN_VALUE;
+  }
+
+  const match = definitions.find((definition) => definition.matches(value));
+  return match ? definition.value : DESCRIPTIVE_UNKNOWN_VALUE;
+}
+
+function buildAgeFilterOptions(records: DescriptiveSubmission[]): DescriptiveFilterOption[] {
+  const options = AGE_BUCKET_DEFINITIONS.map((definition) => ({
+    value: definition.value,
+    label: definition.label,
+    count: records.filter((record) => record.ageBucket === definition.value).length,
+  })).filter((option) => option.count > 0);
+
+  const unknownCount = records.filter((record) => record.ageBucket === DESCRIPTIVE_UNKNOWN_VALUE).length;
+  if (unknownCount > 0) {
+    options.push({ value: DESCRIPTIVE_UNKNOWN_VALUE, label: "Unknown / not reported", count: unknownCount });
+  }
+
+  return options;
+}
+
+function buildParityFilterOptions(records: DescriptiveSubmission[]): DescriptiveFilterOption[] {
+  const options = PARITY_BUCKET_DEFINITIONS.map((definition) => ({
+    value: definition.value,
+    label: definition.label,
+    count: records.filter((record) => record.parityBucket === definition.value).length,
+  })).filter((option) => option.count > 0);
+
+  const unknownCount = records.filter((record) => record.parityBucket === DESCRIPTIVE_UNKNOWN_VALUE).length;
+  if (unknownCount > 0) {
+    options.push({ value: DESCRIPTIVE_UNKNOWN_VALUE, label: "Unknown / not reported", count: unknownCount });
+  }
+
+  return options;
+}
+
+function buildCategoricalFilterOptions(values: Array<DescriptiveCategoryValue | null>): DescriptiveFilterOption[] {
+  const counts = new Map<string, { label: string; count: number }>();
+  let unknownCount = 0;
+
+  values.forEach((item) => {
+    if (!item) {
+      unknownCount += 1;
+      return;
+    }
+    const key = item.value || normalizeKeyName(item.label) || item.label.toLowerCase();
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(key, { label: item.label, count: 1 });
+    }
+  });
+
+  const options = Array.from(counts.entries()).map(([value, data]) => ({
+    value,
+    label: data.label,
+    count: data.count,
+  }));
+
+  options.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.label.localeCompare(b.label);
+  });
+
+  if (unknownCount > 0) {
+    options.push({ value: DESCRIPTIVE_UNKNOWN_VALUE, label: "Unknown / not reported", count: unknownCount });
+  }
+
+  return options;
 }
 
 function toISODate(value?: string): string | undefined {
