@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -51,6 +51,132 @@ export interface DashboardOverviewMetadata {
 }
 
 const ALL_FILTER_VALUE = "all";
+
+const buildFilterOptions = (
+  descriptiveData: DashboardAnalytics["descriptive"] | null,
+): {
+  age: DescriptiveFilterOption[];
+  marital: DescriptiveFilterOption[];
+  education: DescriptiveFilterOption[];
+  location: DescriptiveFilterOption[];
+  parity: DescriptiveFilterOption[];
+} | null => {
+  if (!descriptiveData) {
+    return null;
+  }
+
+  const addAllOption = (options: DescriptiveFilterOption[], label: string): DescriptiveFilterOption[] => [
+    { value: ALL_FILTER_VALUE, label, count: descriptiveData.submissions.length },
+    ...options,
+  ];
+
+  return {
+    age: addAllOption(descriptiveData.filters.age, "All ages"),
+    marital: addAllOption(descriptiveData.filters.maritalStatus, "All marital statuses"),
+    education: addAllOption(descriptiveData.filters.educationLevel, "All education levels"),
+    location: addAllOption(descriptiveData.filters.location, "All locations"),
+    parity: addAllOption(descriptiveData.filters.parity, "All parity levels"),
+  };
+};
+
+const filterSubmissions = (
+  descriptiveData: DashboardAnalytics["descriptive"] | null,
+  filters: {
+    age: string;
+    marital: string;
+    education: string;
+    location: string;
+    parity: string;
+  },
+): DescriptiveSubmission[] => {
+  if (!descriptiveData) {
+    return [];
+  }
+
+  const matchesCategory = (
+    value: DescriptiveSubmission["maritalStatus"],
+    filterValue: string,
+  ) => {
+    if (filterValue === ALL_FILTER_VALUE) return true;
+    if (filterValue === DESCRIPTIVE_UNKNOWN_VALUE) {
+      return value == null;
+    }
+    return value?.value === filterValue;
+  };
+
+  const matchesBucket = (bucket: string | null, filterValue: string) => {
+    if (filterValue === ALL_FILTER_VALUE) return true;
+    if (filterValue === DESCRIPTIVE_UNKNOWN_VALUE) {
+      return bucket === DESCRIPTIVE_UNKNOWN_VALUE;
+    }
+    return bucket === filterValue;
+  };
+
+  return descriptiveData.submissions.filter((submission) => {
+    const ageMatch = matchesBucket(submission.ageBucket, filters.age);
+    const parityMatch = matchesBucket(submission.parityBucket, filters.parity);
+    const maritalMatch = matchesCategory(submission.maritalStatus, filters.marital);
+    const educationMatch = matchesCategory(submission.educationLevel, filters.education);
+    const locationMatch = matchesCategory(submission.location, filters.location);
+
+    return ageMatch && parityMatch && maritalMatch && educationMatch && locationMatch;
+  });
+};
+
+const selectRecords = (
+  descriptiveData: DashboardAnalytics["descriptive"] | null,
+  filteredSubmissions: DescriptiveSubmission[],
+) => {
+  if (!descriptiveData) {
+    return [] as DescriptiveSubmission[];
+  }
+
+  if (filteredSubmissions.length > 0) {
+    return filteredSubmissions;
+  }
+
+  return descriptiveData.submissions;
+};
+
+const buildBaseCards = (stats: DashboardAnalytics["stats"] | undefined): KpiCard[] => {
+  const averageMotivation = stats?.averageMotivation?.value;
+  const averageAbility = stats?.averageAbility?.value;
+
+  return [
+    {
+      title: "Total Respondents",
+      value: formatNumber(stats?.totalRespondents?.value),
+      trendIcon: Users,
+      gradient: "from-chart-1 to-chart-1/60",
+    },
+    {
+      title: "Contraceptive Users",
+      value: formatNumber(stats?.currentUsers?.value),
+      trendIcon: Target,
+      gradient: "from-chart-2 to-chart-2/60",
+    },
+    {
+      title: "Avg Motivation Score",
+      value:
+        averageMotivation == null || Number.isNaN(averageMotivation)
+          ? "n/a"
+          : averageMotivation.toFixed(2),
+      trendIcon: TrendingUp,
+      suffix: " / 5",
+      gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/60",
+    },
+    {
+      title: "Avg Ability Score",
+      value:
+        averageAbility == null || Number.isNaN(averageAbility)
+          ? "n/a"
+          : averageAbility.toFixed(2),
+      trendIcon: Activity,
+      suffix: " / 5",
+      gradient: "from-chart-4 to-chart-4/60",
+    },
+  ];
+};
 
 interface NumericSummary {
   mean: number | null;
@@ -281,30 +407,11 @@ const DashboardOverview = ({
 
   const descriptiveData = descriptive ?? null;
 
-  /**
-   * IMPORTANT: keep all hook dependency lists as inline array literals of identifiers only.
-   * Do not build dependency arrays with variables, spreads, or conditionals.
-   * This avoids React’s runtime “Invalid Hook dependency list” error (minified #310).
-   */
+  const [filterOptions, setFilterOptions] = useState<ReturnType<typeof buildFilterOptions>>(null);
 
-  const filterOptions = useMemo(() => {
-    if (!descriptiveData) {
-      return null;
-    }
-
-    const addAllOption = (options: DescriptiveFilterOption[], label: string): DescriptiveFilterOption[] => [
-      { value: ALL_FILTER_VALUE, label, count: descriptiveData.submissions.length },
-      ...options,
-    ];
-
-    return {
-      age: addAllOption(descriptiveData.filters.age, "All ages"),
-      marital: addAllOption(descriptiveData.filters.maritalStatus, "All marital statuses"),
-      education: addAllOption(descriptiveData.filters.educationLevel, "All education levels"),
-      location: addAllOption(descriptiveData.filters.location, "All locations"),
-      parity: addAllOption(descriptiveData.filters.parity, "All parity levels"),
-    };
-  }, [descriptiveData]); // ✅ inline array literal
+  useEffect(() => {
+    setFilterOptions(buildFilterOptions(descriptiveData));
+  }, [descriptiveData]);
 
   useEffect(() => {
     if (!filterOptions) {
@@ -332,7 +439,7 @@ const DashboardOverview = ({
     ensureOption(locationFilter, filterOptions.location, setLocationFilter);
     ensureOption(parityFilter, filterOptions.parity, setParityFilter);
   }, [
-    filterOptions, // ✅ this is memoized above; array literal remains primitives/ids
+    filterOptions,
     ageFilter,
     maritalFilter,
     educationFilter,
@@ -340,47 +447,13 @@ const DashboardOverview = ({
     parityFilter,
   ]);
 
-  const filteredSubmissions = useMemo(() => {
-    if (!descriptiveData) {
-      return [] as DescriptiveSubmission[];
-    }
-
-    const matchesCategory = (
-      value: DescriptiveSubmission["maritalStatus"],
-      filterValue: string,
-    ) => {
-      if (filterValue === ALL_FILTER_VALUE) return true;
-      if (filterValue === DESCRIPTIVE_UNKNOWN_VALUE) {
-        return value == null;
-      }
-      return value?.value === filterValue;
-    };
-
-    const matchesBucket = (bucket: string | null, filterValue: string) => {
-      if (filterValue === ALL_FILTER_VALUE) return true;
-      if (filterValue === DESCRIPTIVE_UNKNOWN_VALUE) {
-        return bucket === DESCRIPTIVE_UNKNOWN_VALUE;
-      }
-      return bucket === filterValue;
-    };
-
-    return descriptiveData.submissions.filter((submission) => {
-      const ageMatch = matchesBucket(submission.ageBucket, ageFilter);
-      const parityMatch = matchesBucket(submission.parityBucket, parityFilter);
-      const maritalMatch = matchesCategory(submission.maritalStatus, maritalFilter);
-      const educationMatch = matchesCategory(submission.educationLevel, educationFilter);
-      const locationMatch = matchesCategory(submission.location, locationFilter);
-
-      return ageMatch && parityMatch && maritalMatch && educationMatch && locationMatch;
-    });
-  }, [
-    descriptiveData, // ✅ identifier; no spread/concat/conditional
-    ageFilter,
-    maritalFilter,
-    educationFilter,
-    locationFilter,
-    parityFilter,
-  ]);
+  const filteredSubmissions = filterSubmissions(descriptiveData, {
+    age: ageFilter,
+    marital: maritalFilter,
+    education: educationFilter,
+    location: locationFilter,
+    parity: parityFilter,
+  });
 
   const totalSubmissions = descriptiveData?.submissions.length ?? 0;
   const filteredCount = filteredSubmissions.length;
@@ -388,18 +461,12 @@ const DashboardOverview = ({
     .some((value) => value !== ALL_FILTER_VALUE);
   const showFilteredEmpty = Boolean(descriptiveData && isFiltered && filteredCount === 0);
 
-  const demographicSummary = useMemo(() => {
+  const demographicSummary = (() => {
     if (!descriptiveData || showFilteredEmpty) {
       return null;
     }
 
-    // Ensure we only depend on primitives/stable ids in the deps
-    // (records is derived from primitive filters & descriptiveData only)
-    // No objects/functions are included directly in deps below.
-
-    const records = filteredSubmissions.length > 0
-      ? filteredSubmissions
-      : descriptiveData.submissions;
+    const records = selectRecords(descriptiveData, filteredSubmissions);
 
     if (records.length === 0) {
       return null;
@@ -413,58 +480,52 @@ const DashboardOverview = ({
       education: computeCategorySummary(records, (record) => record.educationLevel),
       location: computeCategorySummary(records, (record) => record.location),
     };
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
+  })();
 
   const motivationSummaries: Array<{
     definition: (typeof MOTIVATION_SUBDOMAINS)[number];
     summary: NumericSummary;
-  }> | null = useMemo(() => {
+  }> | null = (() => {
     if (!descriptiveData || showFilteredEmpty) {
       return null;
     }
 
-    const records = filteredSubmissions.length > 0
-      ? filteredSubmissions
-      : descriptiveData.submissions;
+    const records = selectRecords(descriptiveData, filteredSubmissions);
 
     return MOTIVATION_SUBDOMAINS.map((definition) => ({
       definition,
       summary: computeNumericSummary(records.map((record) => record.motivationItems?.[definition.key] ?? null)),
     }));
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
+  })();
 
   const abilitySummaries: Array<{
     definition: (typeof ABILITY_SUBDOMAINS)[number];
     summary: NumericSummary;
-  }> | null = useMemo(() => {
+  }> | null = (() => {
     if (!descriptiveData || showFilteredEmpty) {
       return null;
     }
 
-    const records = filteredSubmissions.length > 0
-      ? filteredSubmissions
-      : descriptiveData.submissions;
+    const records = selectRecords(descriptiveData, filteredSubmissions);
 
     return ABILITY_SUBDOMAINS.map((definition) => ({
       definition,
       summary: computeNumericSummary(records.map((record) => record.abilityItems?.[definition.key] ?? null)),
     }));
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
+  })();
 
-  const normSummaries = useMemo(() => {
+  const normSummaries = (() => {
     if (!descriptiveData || showFilteredEmpty) {
       return null;
     }
 
-    const records = filteredSubmissions.length > 0
-      ? filteredSubmissions
-      : descriptiveData.submissions;
+    const records = selectRecords(descriptiveData, filteredSubmissions);
 
     return {
       descriptive: computeLikertSummary(records.map((record) => record.descriptiveNorms)),
       injunctive: computeLikertSummary(records.map((record) => record.injunctiveNorms)),
     };
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
+  })();
 
   const handleResetFilters = () => {
     setAgeFilter(ALL_FILTER_VALUE);
@@ -494,47 +555,9 @@ const DashboardOverview = ({
         }
       : metadata;
 
-  const baseCards: KpiCard[] = useMemo(() => {
-    const averageMotivation = stats?.averageMotivation?.value;
-    const averageAbility = stats?.averageAbility?.value;
+  const baseCards = buildBaseCards(stats);
 
-    return [
-      {
-        title: "Total Respondents",
-        value: formatNumber(stats?.totalRespondents?.value),
-        trendIcon: Users,
-        gradient: "from-chart-1 to-chart-1/60",
-      },
-      {
-        title: "Contraceptive Users",
-        value: formatNumber(stats?.currentUsers?.value),
-        trendIcon: Target,
-        gradient: "from-chart-2 to-chart-2/60",
-      },
-      {
-        title: "Avg Motivation Score",
-        value:
-          averageMotivation == null || Number.isNaN(averageMotivation)
-            ? "n/a"
-            : averageMotivation.toFixed(2),
-        trendIcon: TrendingUp,
-        suffix: " / 5",
-        gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/60",
-      },
-      {
-        title: "Avg Ability Score",
-        value:
-          averageAbility == null || Number.isNaN(averageAbility)
-            ? "n/a"
-            : averageAbility.toFixed(2),
-        trendIcon: Activity,
-        suffix: " / 5",
-        gradient: "from-chart-4 to-chart-4/60",
-      },
-    ];
-  }, [stats]); // ✅
-
-  const descriptiveCards: KpiCard[] = useMemo(() => {
+  const descriptiveCards: KpiCard[] = (() => {
     const items: KpiCard[] = [];
 
     if (demographicSummary) {
@@ -646,13 +669,13 @@ const DashboardOverview = ({
     }
 
     return items;
-  }, [abilitySummaries, demographicSummary, motivationSummaries, normSummaries]); // ✅
+  })();
 
-  const cards = baseCards.concat(descriptiveCards);
+  const cards = [...baseCards, ...descriptiveCards];
 
   const [activeSlide, setActiveSlide] = useState(0);
 
-  const chunkedCards = useMemo(() => {
+  const chunkedCards = (() => {
     const chunkSize = 4;
     const chunks: KpiCard[][] = [];
 
@@ -661,7 +684,7 @@ const DashboardOverview = ({
     }
 
     return chunks.length > 0 ? chunks : [[]];
-  }, [cards.length]);
+  })();
 
   const hasMultipleSlides = chunkedCards.length > 1;
   const safeActiveSlide = Math.min(activeSlide, chunkedCards.length - 1);
