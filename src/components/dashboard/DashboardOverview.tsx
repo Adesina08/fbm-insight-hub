@@ -484,26 +484,29 @@ const DashboardOverview = ({
         }
       : metadata;
 
-  const baseCards: KpiCard[] = useMemo(() => (
-    [
+  const baseCards: KpiCard[] = useMemo(() => {
+    const averageMotivation = stats?.averageMotivation?.value;
+    const averageAbility = stats?.averageAbility?.value;
+
+    return [
       {
         title: "Total Respondents",
-        value: formatNumber(stats.totalRespondents.value),
+        value: formatNumber(stats?.totalRespondents?.value),
         trendIcon: Users,
         gradient: "from-chart-1 to-chart-1/60",
       },
       {
         title: "Contraceptive Users",
-        value: formatNumber(stats.currentUsers.value),
+        value: formatNumber(stats?.currentUsers?.value),
         trendIcon: Target,
         gradient: "from-chart-2 to-chart-2/60",
       },
       {
         title: "Avg Motivation Score",
         value:
-          stats.averageMotivation.value == null || Number.isNaN(stats.averageMotivation.value)
+          averageMotivation == null || Number.isNaN(averageMotivation)
             ? "n/a"
-            : stats.averageMotivation.value.toFixed(2),
+            : averageMotivation.toFixed(2),
         trendIcon: TrendingUp,
         suffix: " / 5",
         gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/60",
@@ -511,15 +514,15 @@ const DashboardOverview = ({
       {
         title: "Avg Ability Score",
         value:
-          stats.averageAbility.value == null || Number.isNaN(stats.averageAbility.value)
+          averageAbility == null || Number.isNaN(averageAbility)
             ? "n/a"
-            : stats.averageAbility.value.toFixed(2),
+            : averageAbility.toFixed(2),
         trendIcon: Activity,
         suffix: " / 5",
         gradient: "from-chart-4 to-chart-4/60",
       },
-    ]
-  ), [stats]);
+    ];
+  }, [stats]);
 
   const descriptiveCards: KpiCard[] = useMemo(() => {
     const items: KpiCard[] = [];
