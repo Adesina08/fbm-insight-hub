@@ -1,4 +1,4 @@
-import { type ChangeEvent, useRef, useState } from "react";
+import { type ChangeEvent, useId, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Users, Target, Zap, Network, Loader2 } from "lucide-react";
 import DashboardOverview, { type DashboardOverviewMetadata } from "@/components/dashboard/DashboardOverview";
@@ -138,6 +138,9 @@ const computeIsPdfDisabled = ({
 const Index = () => {
 
   const [activeTab, setActiveTab] = useState("overview");
+  const dataSourceId = useId();
+  const liveModeId = `${dataSourceId}-live`;
+  const uploadModeId = `${dataSourceId}-upload`;
   const [dataMode, setDataMode] = useState<DataMode | null>(null);
   const [pendingMode, setPendingMode] = useState<DataMode | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -260,9 +263,9 @@ const Index = () => {
               className="space-y-4"
             >
               <div className="flex items-start space-x-3 rounded-lg border p-4">
-                <RadioGroupItem value="live" id="mode-live" className="mt-1" />
+                <RadioGroupItem value="live" id={liveModeId} className="mt-1" />
                 <div>
-                  <Label htmlFor="mode-live" className="text-base font-medium">
+                  <Label htmlFor={liveModeId} className="text-base font-medium">
                     Use live data source
                   </Label>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -271,9 +274,9 @@ const Index = () => {
                 </div>
               </div>
               <div className="flex items-start space-x-3 rounded-lg border p-4">
-                <RadioGroupItem value="upload" id="mode-upload" className="mt-1" />
+                <RadioGroupItem value="upload" id={uploadModeId} className="mt-1" />
                 <div>
-                  <Label htmlFor="mode-upload" className="text-base font-medium">
+                  <Label htmlFor={uploadModeId} className="text-base font-medium">
                     Upload my dataset
                   </Label>
                   <p className="text-sm text-muted-foreground mt-1">
