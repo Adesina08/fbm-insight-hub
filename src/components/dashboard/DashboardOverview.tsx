@@ -15,6 +15,10 @@ import {
   GraduationCap,
   MapPin,
   UserPlus,
+  Zap,
+  BarChart3,
+  Network,
+  UserCheck,
 } from "lucide-react";
 import {
   DESCRIPTIVE_UNKNOWN_VALUE,
@@ -65,6 +69,14 @@ interface CategorySummary {
   share: number | null;
   unknownCount: number;
 }
+
+type KpiCard = {
+  title: string;
+  value: string;
+  trendIcon: LucideIcon;
+  suffix?: string;
+  gradient: string;
+};
 
 const computeNumericSummary = (values: Array<number | null>): NumericSummary => {
   const numeric = values.filter((value): value is number => value != null && Number.isFinite(value));
@@ -154,6 +166,22 @@ const computeCategorySummary = (
 const formatDecimal = (value: number | null, digits = 1) => {
   if (value == null || Number.isNaN(value)) return "n/a";
   return value.toFixed(digits);
+};
+
+const findTopSummary = <T,>(items: Array<{ definition: T; summary: NumericSummary }> | null) => {
+  if (!items) return null;
+
+  let top: { definition: T; summary: NumericSummary } | null = null;
+  for (const item of items) {
+    if (item.summary.count === 0 || item.summary.mean == null || Number.isNaN(item.summary.mean)) {
+      continue;
+    }
+    if (!top || (item.summary.mean ?? 0) > (top.summary.mean ?? 0)) {
+      top = item;
+    }
+  }
+
+  return top;
 };
 
 const MOTIVATION_SUBDOMAINS: ReadonlyArray<{
@@ -375,7 +403,10 @@ const DashboardOverview = ({
     };
   }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
 
-  const motivationSummaries = useMemo(() => {
+  const motivationSummaries: Array<{
+    definition: (typeof MOTIVATION_SUBDOMAINS)[number];
+    summary: NumericSummary;
+  }> | null = useMemo(() => {
     if (!descriptiveData || showFilteredEmpty) {
       return null;
     }
@@ -390,7 +421,10 @@ const DashboardOverview = ({
     }));
   }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
 
-  const abilitySummaries = useMemo(() => {
+  const abilitySummaries: Array<{
+    definition: (typeof ABILITY_SUBDOMAINS)[number];
+    summary: NumericSummary;
+  }> | null = useMemo(() => {
     if (!descriptiveData || showFilteredEmpty) {
       return null;
     }
@@ -448,51 +482,267 @@ const DashboardOverview = ({
         }
       : metadata;
 
-  const cards: Array<{
-    title: string;
-    value: string;
-    trendIcon: LucideIcon;
-    suffix: string;
-    gradient: string;
-  }> = [
-    {
-      title: "Total Respondents",
-      value: formatNumber(stats.totalRespondents.value),
-      trendIcon: Users,
-      suffix: "",
-      gradient: "from-chart-1 to-chart-1/60",
-    },
-    {
-      title: "Contraceptive Users",
-      value: formatNumber(stats.currentUsers.value),
-      trendIcon: Target,
-      suffix: "",
-      gradient: "from-chart-2 to-chart-2/60",
-    },
-    {
-      title: "Avg Motivation Score",
-      value:
-        stats.averageMotivation.value == null || Number.isNaN(stats.averageMotivation.value)
-          ? "n/a"
-          : stats.averageMotivation.value.toFixed(2),
-      trendIcon: TrendingUp,
-      suffix: " / 5",
-      gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/60",
-    },
-    {
-      title: "Avg Ability Score",
-      value:
-        stats.averageAbility.value == null || Number.isNaN(stats.averageAbility.value)
-          ? "n/a"
-          : stats.averageAbility.value.toFixed(2),
-      trendIcon: Activity,
-      suffix: " / 5",
-      gradient: "from-chart-4 to-chart-4/60",
-    },
-  ];
+  const baseCards: KpiCard[] = useMemo(() => (
+    [
+      {
+        title: "Total Respondents",
+        value: formatNumber(stats.totalRespondents.value),
+        trendIcon: Users,
+        gradient: "from-chart-1 to-chart-1/60",
+      },
+      {
+        title: "Contraceptive Users",
+        value: formatNumber(stats.currentUsers.value),
+        trendIcon: Target,
+        gradient: "from-chart-2 to-chart-2/60",
+      },
+      {
+        title: "Avg Motivation Score",
+        value:
+          stats.averageMotivation.value == null || Number.isNaN(stats.averageMotivation.value)
+            ? "n/a"
+            : stats.averageMotivation.value.toFixed(2),
+        trendIcon: TrendingUp,
+        suffix: " / 5",
+        gradient: "from-quadrant-high-m-high-a to-quadrant-high-m-high-a/60",
+      },
+      {
+        title: "Avg Ability Score",
+        value:
+          stats.averageAbility.value == null || Number.isNaN(stats.averageAbility.value)
+            ? "n/a"
+            : stats.averageAbility.value.toFixed(2),
+        trendIcon: Activity,
+        suffix: " / 5",
+        gradient: "from-chart-4 to-chart-4/60",
+      },
+    ]
+  ), [stats]);
+
+  const descriptiveCards: KpiCard[] = useMemo(() => {
+    const items: KpiCard[] = [];
+
+    if (demographicSummary) {
+      items.push(
+        {
+          title: "Mean age",
+          value: formatDecimal(demographicSummary.age.mean, 1),
+          trendIcon: Calendar,
+          suffix: " yrs",
+          gradient: "from-sky-500 to-sky-300/60",
+        },
+        {
+          title: "Top marital status",
+          value: demographicSummary.marital.label ?? "n/a",
+          trendIcon: Heart,
+          suffix:
+            demographicSummary.marital.share != null
+              ? ` · ${formatPercentage(demographicSummary.marital.share * 100)}`
+              : undefined,
+          gradient: "from-rose-500 to-rose-300/60",
+        },
+        {
+          title: "Top education level",
+          value: demographicSummary.education.label ?? "n/a",
+          trendIcon: GraduationCap,
+          suffix:
+            demographicSummary.education.share != null
+              ? ` · ${formatPercentage(demographicSummary.education.share * 100)}`
+              : undefined,
+          gradient: "from-indigo-500 to-indigo-300/60",
+        },
+        {
+          title: "Leading location",
+          value: demographicSummary.location.label ?? "n/a",
+          trendIcon: MapPin,
+          suffix:
+            demographicSummary.location.share != null
+              ? ` · ${formatPercentage(demographicSummary.location.share * 100)}`
+              : undefined,
+          gradient: "from-emerald-500 to-emerald-300/60",
+        },
+        {
+          title: "Mean parity",
+          value: formatDecimal(demographicSummary.parity.mean, 1),
+          trendIcon: UserPlus,
+          suffix: " children",
+          gradient: "from-amber-500 to-amber-300/60",
+        },
+      );
+    }
+
+    const topMotivation = findTopSummary(motivationSummaries);
+    if (topMotivation) {
+      items.push({
+        title: "Strongest motivation",
+        value: topMotivation.definition.title,
+        trendIcon: BarChart3,
+        suffix:
+          topMotivation.summary.mean != null
+            ? ` · ${topMotivation.summary.mean.toFixed(2)}/5`
+            : undefined,
+        gradient: "from-violet-500 to-violet-300/60",
+      });
+    }
+
+    const topAbility = findTopSummary(abilitySummaries);
+    if (topAbility) {
+      items.push({
+        title: "Strongest ability",
+        value: topAbility.definition.title,
+        trendIcon: Zap,
+        suffix:
+          topAbility.summary.mean != null
+            ? ` · ${topAbility.summary.mean.toFixed(2)}/5`
+            : undefined,
+        gradient: "from-orange-500 to-orange-300/60",
+      });
+    }
+
+    if (normSummaries) {
+      items.push(
+        {
+          title: "High descriptive norms",
+          value:
+            normSummaries.descriptive.positiveShare != null
+              ? formatPercentage(normSummaries.descriptive.positiveShare * 100)
+              : "n/a",
+          trendIcon: Network,
+          suffix:
+            normSummaries.descriptive.mean != null
+              ? ` · Avg ${normSummaries.descriptive.mean.toFixed(2)}/5`
+              : undefined,
+          gradient: "from-cyan-500 to-cyan-300/60",
+        },
+        {
+          title: "High injunctive norms",
+          value:
+            normSummaries.injunctive.positiveShare != null
+              ? formatPercentage(normSummaries.injunctive.positiveShare * 100)
+              : "n/a",
+          trendIcon: UserCheck,
+          suffix:
+            normSummaries.injunctive.mean != null
+              ? ` · Avg ${normSummaries.injunctive.mean.toFixed(2)}/5`
+              : undefined,
+          gradient: "from-teal-500 to-teal-300/60",
+        },
+      );
+    }
+
+    return items;
+  }, [abilitySummaries, demographicSummary, motivationSummaries, normSummaries]);
+
+  const cards = useMemo(
+    () => [...baseCards, ...descriptiveCards],
+    [baseCards, descriptiveCards],
+  );
 
   return (
     <div className="space-y-8 animate-fade-in print:space-y-10">
+      {descriptiveData ? (
+        <div className="mx-auto w-full max-w-6xl space-y-4 rounded-xl border border-border/40 bg-card/50 p-4 shadow-sm print:hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium text-muted-foreground">Filter respondents</h3>
+              <p className="text-xs text-muted-foreground">
+                Showing {formatNumber(filteredCount, { maximumFractionDigits: 0 })} of {formatNumber(totalSubmissions, { maximumFractionDigits: 0 })} respondents.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              disabled={!isFiltered}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear filters
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <div className="min-w-[160px] flex-1 md:flex-initial md:w-[200px]">
+              <Select value={ageFilter} onValueChange={setAgeFilter} disabled={!filterOptions}>
+                <SelectTrigger className="w-full bg-card/60">
+                  <SelectValue placeholder="All ages" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(filterOptions?.age ?? []).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[160px] flex-1 md:flex-initial md:w-[220px]">
+              <Select value={maritalFilter} onValueChange={setMaritalFilter} disabled={!filterOptions}>
+                <SelectTrigger className="w-full bg-card/60">
+                  <SelectValue placeholder="All marital statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(filterOptions?.marital ?? []).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[160px] flex-1 md:flex-initial md:w-[220px]">
+              <Select value={educationFilter} onValueChange={setEducationFilter} disabled={!filterOptions}>
+                <SelectTrigger className="w-full bg-card/60">
+                  <SelectValue placeholder="All education levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(filterOptions?.education ?? []).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[160px] flex-1 md:flex-initial md:w-[220px]">
+              <Select value={locationFilter} onValueChange={setLocationFilter} disabled={!filterOptions}>
+                <SelectTrigger className="w-full bg-card/60">
+                  <SelectValue placeholder="All locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(filterOptions?.location ?? []).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[160px] flex-1 md:flex-initial md:w-[200px]">
+              <Select value={parityFilter} onValueChange={setParityFilter} disabled={!filterOptions}>
+                <SelectTrigger className="w-full bg-card/60">
+                  <SelectValue placeholder="All parity levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(filterOptions?.parity ?? []).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {showFilteredEmpty ? (
+            <Alert variant="secondary" className="border-border/60 bg-card/60">
+              <AlertTitle>No respondents match the selected filters</AlertTitle>
+              <AlertDescription className="text-sm text-muted-foreground">
+                Adjust one or more filters to widen the selection.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
         {metadataContent ? (
           <div>
@@ -516,99 +766,6 @@ const DashboardOverview = ({
           </Button>
         ) : null}
       </div>
-
-      {descriptiveData ? (
-        <div className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-muted-foreground">Filter respondents</h3>
-              <p className="text-xs text-muted-foreground">
-                Showing {formatNumber(filteredCount, { maximumFractionDigits: 0 })} of {formatNumber(totalSubmissions, { maximumFractionDigits: 0 })} respondents.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleResetFilters}
-              disabled={!isFiltered}
-              className="self-start text-xs text-muted-foreground hover:text-foreground print:hidden"
-            >
-              Clear filters
-            </Button>
-          </div>
-          <div className="grid gap-3 print:hidden md:grid-cols-2 xl:grid-cols-5">
-            <Select value={ageFilter} onValueChange={setAgeFilter} disabled={!filterOptions}>
-              <SelectTrigger className="bg-card/60">
-                <SelectValue placeholder="All ages" />
-              </SelectTrigger>
-              <SelectContent>
-                {(filterOptions?.age ?? []).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={maritalFilter} onValueChange={setMaritalFilter} disabled={!filterOptions}>
-              <SelectTrigger className="bg-card/60">
-                <SelectValue placeholder="All marital statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                {(filterOptions?.marital ?? []).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={educationFilter} onValueChange={setEducationFilter} disabled={!filterOptions}>
-              <SelectTrigger className="bg-card/60">
-                <SelectValue placeholder="All education levels" />
-              </SelectTrigger>
-              <SelectContent>
-                {(filterOptions?.education ?? []).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={locationFilter} onValueChange={setLocationFilter} disabled={!filterOptions}>
-              <SelectTrigger className="bg-card/60">
-                <SelectValue placeholder="All locations" />
-              </SelectTrigger>
-              <SelectContent>
-                {(filterOptions?.location ?? []).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={parityFilter} onValueChange={setParityFilter} disabled={!filterOptions}>
-              <SelectTrigger className="bg-card/60">
-                <SelectValue placeholder="All parity levels" />
-              </SelectTrigger>
-              <SelectContent>
-                {(filterOptions?.parity ?? []).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {showFilteredEmpty ? (
-            <Alert variant="secondary" className="border-border/60 bg-card/60">
-              <AlertTitle>No respondents match the selected filters</AlertTitle>
-              <AlertDescription className="text-sm text-muted-foreground">
-                Adjust one or more filters to widen the selection.
-              </AlertDescription>
-            </Alert>
-          ) : null}
-        </div>
-      ) : null}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 print:grid-cols-2 print:gap-5">
         {cards.map((card) => {
