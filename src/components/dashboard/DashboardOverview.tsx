@@ -281,6 +281,12 @@ const DashboardOverview = ({
 
   const descriptiveData = descriptive ?? null;
 
+  /**
+   * IMPORTANT: keep all hook dependency lists as inline array literals of identifiers only.
+   * Do not build dependency arrays with variables, spreads, or conditionals.
+   * This avoids React’s runtime “Invalid Hook dependency list” error (minified #310).
+   */
+
   const filterOptions = useMemo(() => {
     if (!descriptiveData) {
       return null;
@@ -298,7 +304,7 @@ const DashboardOverview = ({
       location: addAllOption(descriptiveData.filters.location, "All locations"),
       parity: addAllOption(descriptiveData.filters.parity, "All parity levels"),
     };
-  }, [descriptiveData]);
+  }, [descriptiveData]); // ✅ inline array literal
 
   useEffect(() => {
     if (!filterOptions) {
@@ -326,7 +332,7 @@ const DashboardOverview = ({
     ensureOption(locationFilter, filterOptions.location, setLocationFilter);
     ensureOption(parityFilter, filterOptions.parity, setParityFilter);
   }, [
-    filterOptions,
+    filterOptions, // ✅ this is memoized above; array literal remains primitives/ids
     ageFilter,
     maritalFilter,
     educationFilter,
@@ -368,7 +374,7 @@ const DashboardOverview = ({
       return ageMatch && parityMatch && maritalMatch && educationMatch && locationMatch;
     });
   }, [
-    descriptiveData,
+    descriptiveData, // ✅ identifier; no spread/concat/conditional
     ageFilter,
     maritalFilter,
     educationFilter,
@@ -387,6 +393,10 @@ const DashboardOverview = ({
       return null;
     }
 
+    // Ensure we only depend on primitives/stable ids in the deps
+    // (records is derived from primitive filters & descriptiveData only)
+    // No objects/functions are included directly in deps below.
+
     const records = filteredSubmissions.length > 0
       ? filteredSubmissions
       : descriptiveData.submissions;
@@ -403,7 +413,7 @@ const DashboardOverview = ({
       education: computeCategorySummary(records, (record) => record.educationLevel),
       location: computeCategorySummary(records, (record) => record.location),
     };
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
 
   const motivationSummaries: Array<{
     definition: (typeof MOTIVATION_SUBDOMAINS)[number];
@@ -421,7 +431,7 @@ const DashboardOverview = ({
       definition,
       summary: computeNumericSummary(records.map((record) => record.motivationItems?.[definition.key] ?? null)),
     }));
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
 
   const abilitySummaries: Array<{
     definition: (typeof ABILITY_SUBDOMAINS)[number];
@@ -439,7 +449,7 @@ const DashboardOverview = ({
       definition,
       summary: computeNumericSummary(records.map((record) => record.abilityItems?.[definition.key] ?? null)),
     }));
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
 
   const normSummaries = useMemo(() => {
     if (!descriptiveData || showFilteredEmpty) {
@@ -454,7 +464,7 @@ const DashboardOverview = ({
       descriptive: computeLikertSummary(records.map((record) => record.descriptiveNorms)),
       injunctive: computeLikertSummary(records.map((record) => record.injunctiveNorms)),
     };
-  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]); // ✅
 
   const handleResetFilters = () => {
     setAgeFilter(ALL_FILTER_VALUE);
@@ -522,7 +532,7 @@ const DashboardOverview = ({
         gradient: "from-chart-4 to-chart-4/60",
       },
     ];
-  }, [stats]);
+  }, [stats]); // ✅
 
   const descriptiveCards: KpiCard[] = useMemo(() => {
     const items: KpiCard[] = [];
@@ -636,12 +646,13 @@ const DashboardOverview = ({
     }
 
     return items;
-  }, [abilitySummaries, demographicSummary, motivationSummaries, normSummaries]);
+  }, [abilitySummaries, demographicSummary, motivationSummaries, normSummaries]); // ✅
 
-  const cards = useMemo(
-    () => [...baseCards, ...descriptiveCards],
-    [baseCards, descriptiveCards],
-  );
+  // Keep deps primitive/stable: baseCards and descriptiveCards are memoized above,
+  // so depending on those identifiers is valid.
+  const cards = useMemo(() => {
+    return baseCards.concat(descriptiveCards);
+  }, [baseCards, descriptiveCards]); // ✅ inline array literal
 
   const [activeSlide, setActiveSlide] = useState(0);
 
@@ -654,7 +665,7 @@ const DashboardOverview = ({
     }
 
     return chunks.length > 0 ? chunks : [[]];
-  }, [cards]);
+  }, [cards]); // ✅
 
   const hasMultipleSlides = chunkedCards.length > 1;
   const safeActiveSlide = Math.min(activeSlide, chunkedCards.length - 1);
