@@ -1,11 +1,32 @@
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { LucideIcon } from "lucide-react";
-import { Users, TrendingUp, Activity, Target, RefreshCcw } from "lucide-react";
-import type { DashboardAnalytics, QuadrantInsight } from "@/lib/googleSheets";
+import {
+  Users,
+  TrendingUp,
+  Activity,
+  Target,
+  RefreshCcw,
+  Calendar,
+  Heart,
+  GraduationCap,
+  MapPin,
+  UserPlus,
+} from "lucide-react";
+import {
+  DESCRIPTIVE_UNKNOWN_VALUE,
+  type AbilitySubdomainId,
+  type DashboardAnalytics,
+  type DescriptiveFilterOption,
+  type DescriptiveSubmission,
+  type MotivationSubdomainId,
+  type QuadrantInsight,
+} from "@/lib/googleSheets";
 import { formatAverage, formatNumber, formatPercentage } from "@/lib/dashboardFormatters";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DashboardOverviewProps {
   stats?: DashboardAnalytics["stats"];
@@ -15,12 +36,149 @@ interface DashboardOverviewProps {
   error?: string | null;
   onRetry?: () => void;
   metadata?: DashboardOverviewMetadata | null;
+  descriptive?: DashboardAnalytics["descriptive"];
 }
 
 export interface DashboardOverviewMetadata {
   primary: string;
   secondary?: string;
 }
+
+const ALL_FILTER_VALUE = "all";
+
+interface NumericSummary {
+  mean: number | null;
+  median: number | null;
+  sd: number | null;
+  count: number;
+}
+
+interface LikertSummary extends NumericSummary {
+  topValue: number | null;
+  topShare: number | null;
+  positiveShare: number | null;
+}
+
+interface CategorySummary {
+  label: string | null;
+  count: number;
+  share: number | null;
+  unknownCount: number;
+}
+
+const computeNumericSummary = (values: Array<number | null>): NumericSummary => {
+  const numeric = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (numeric.length === 0) {
+    return { mean: null, median: null, sd: null, count: 0 };
+  }
+
+  const mean = numeric.reduce((acc, value) => acc + value, 0) / numeric.length;
+  const sorted = [...numeric].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  const variance = sorted.length > 1
+    ? sorted.reduce((acc, value) => acc + (value - mean) ** 2, 0) / (sorted.length - 1)
+    : 0;
+  const sd = sorted.length > 1 ? Math.sqrt(variance) : 0;
+
+  return { mean, median, sd, count: numeric.length };
+};
+
+const computeLikertSummary = (values: Array<number | null>): LikertSummary => {
+  const summary = computeNumericSummary(values);
+  const numeric = values.filter((value): value is number => value != null && Number.isFinite(value));
+  const counts = new Map<number, number>();
+
+  numeric.forEach((value) => {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  });
+
+  let topValue: number | null = null;
+  let topCount = 0;
+  counts.forEach((count, value) => {
+    if (count > topCount) {
+      topCount = count;
+      topValue = value;
+    }
+  });
+
+  const positiveCount = numeric.filter((value) => value >= 4).length;
+
+  return {
+    ...summary,
+    topValue,
+    topShare: summary.count > 0 && topCount > 0 ? topCount / summary.count : null,
+    positiveShare: summary.count > 0 ? positiveCount / summary.count : null,
+  };
+};
+
+const computeCategorySummary = (
+  records: DescriptiveSubmission[],
+  accessor: (record: DescriptiveSubmission) => DescriptiveSubmission["maritalStatus"],
+): CategorySummary => {
+  if (records.length === 0) {
+    return { label: null, count: 0, share: null, unknownCount: 0 };
+  }
+
+  const counts = new Map<string, { label: string; count: number; isUnknown: boolean }>();
+
+  records.forEach((record) => {
+    const item = accessor(record);
+    const key = item ? item.value : DESCRIPTIVE_UNKNOWN_VALUE;
+    const label = item ? item.label : "Unknown / not reported";
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(key, { label, count: 1, isUnknown: !item });
+    }
+  });
+
+  const knownEntries = Array.from(counts.values()).filter((entry) => !entry.isUnknown);
+  const topEntry = knownEntries.sort((a, b) => b.count - a.count)[0];
+  const unknownCount = counts.get(DESCRIPTIVE_UNKNOWN_VALUE)?.count ?? 0;
+
+  if (!topEntry) {
+    return { label: null, count: 0, share: null, unknownCount };
+  }
+
+  return {
+    label: topEntry.label,
+    count: topEntry.count,
+    share: topEntry.count / records.length,
+    unknownCount,
+  };
+};
+
+const formatDecimal = (value: number | null, digits = 1) => {
+  if (value == null || Number.isNaN(value)) return "n/a";
+  return value.toFixed(digits);
+};
+
+const MOTIVATION_SUBDOMAINS: ReadonlyArray<{
+  key: MotivationSubdomainId;
+  title: string;
+  description: string;
+}> = [
+  { key: "C1", title: "Personal desire", description: "How much respondents want to use a method." },
+  { key: "C2", title: "Perceived benefit", description: "Belief that contraception will benefit them." },
+  { key: "C3", title: "Emotional response", description: "How pleasant or unpleasant use feels." },
+  { key: "C4", title: "Social acceptance", description: "Perceived approval from important people." },
+] as const;
+
+const ABILITY_SUBDOMAINS: ReadonlyArray<{
+  key: AbilitySubdomainId;
+  title: string;
+  description: string;
+}> = [
+  { key: "D1", title: "Finding a method", description: "Ease of locating a modern method." },
+  { key: "D2", title: "Affordability", description: "Perceived affordability of methods." },
+  { key: "D3", title: "Physical access", description: "Physical ease of getting and using methods." },
+  { key: "D4", title: "Mental access", description: "Ease of understanding and remembering use." },
+  { key: "D5", title: "Fits daily life", description: "How well contraception fits routines." },
+  { key: "D6", title: "Self-efficacy", description: "Confidence in using a method correctly." },
+] as const;
 
 const lastUpdatedLabel = (timestamp?: string) => {
   if (!timestamp) return "Never";
@@ -83,7 +241,193 @@ const DashboardOverview = ({
   error,
   onRetry,
   metadata,
+  descriptive,
 }: DashboardOverviewProps) => {
+  const [ageFilter, setAgeFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [maritalFilter, setMaritalFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [educationFilter, setEducationFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [locationFilter, setLocationFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [parityFilter, setParityFilter] = useState<string>(ALL_FILTER_VALUE);
+
+  const descriptiveData = descriptive ?? null;
+
+  const filterOptions = useMemo(() => {
+    if (!descriptiveData) {
+      return null;
+    }
+
+    const addAllOption = (options: DescriptiveFilterOption[], label: string): DescriptiveFilterOption[] => [
+      { value: ALL_FILTER_VALUE, label, count: descriptiveData.submissions.length },
+      ...options,
+    ];
+
+    return {
+      age: addAllOption(descriptiveData.filters.age, "All ages"),
+      marital: addAllOption(descriptiveData.filters.maritalStatus, "All marital statuses"),
+      education: addAllOption(descriptiveData.filters.educationLevel, "All education levels"),
+      location: addAllOption(descriptiveData.filters.location, "All locations"),
+      parity: addAllOption(descriptiveData.filters.parity, "All parity levels"),
+    };
+  }, [descriptiveData]);
+
+  useEffect(() => {
+    if (!filterOptions) {
+      setAgeFilter(ALL_FILTER_VALUE);
+      setMaritalFilter(ALL_FILTER_VALUE);
+      setEducationFilter(ALL_FILTER_VALUE);
+      setLocationFilter(ALL_FILTER_VALUE);
+      setParityFilter(ALL_FILTER_VALUE);
+      return;
+    }
+
+    const ensureOption = (
+      current: string,
+      options: Array<{ value: string }>,
+      setter: (value: string) => void,
+    ) => {
+      if (!options.some((option) => option.value === current)) {
+        setter(ALL_FILTER_VALUE);
+      }
+    };
+
+    ensureOption(ageFilter, filterOptions.age, setAgeFilter);
+    ensureOption(maritalFilter, filterOptions.marital, setMaritalFilter);
+    ensureOption(educationFilter, filterOptions.education, setEducationFilter);
+    ensureOption(locationFilter, filterOptions.location, setLocationFilter);
+    ensureOption(parityFilter, filterOptions.parity, setParityFilter);
+  }, [
+    filterOptions,
+    ageFilter,
+    maritalFilter,
+    educationFilter,
+    locationFilter,
+    parityFilter,
+  ]);
+
+  const filteredSubmissions = useMemo(() => {
+    if (!descriptiveData) {
+      return [] as DescriptiveSubmission[];
+    }
+
+    const matchesCategory = (
+      value: DescriptiveSubmission["maritalStatus"],
+      filterValue: string,
+    ) => {
+      if (filterValue === ALL_FILTER_VALUE) return true;
+      if (filterValue === DESCRIPTIVE_UNKNOWN_VALUE) {
+        return value == null;
+      }
+      return value?.value === filterValue;
+    };
+
+    const matchesBucket = (bucket: string | null, filterValue: string) => {
+      if (filterValue === ALL_FILTER_VALUE) return true;
+      if (filterValue === DESCRIPTIVE_UNKNOWN_VALUE) {
+        return bucket === DESCRIPTIVE_UNKNOWN_VALUE;
+      }
+      return bucket === filterValue;
+    };
+
+    return descriptiveData.submissions.filter((submission) => {
+      const ageMatch = matchesBucket(submission.ageBucket, ageFilter);
+      const parityMatch = matchesBucket(submission.parityBucket, parityFilter);
+      const maritalMatch = matchesCategory(submission.maritalStatus, maritalFilter);
+      const educationMatch = matchesCategory(submission.educationLevel, educationFilter);
+      const locationMatch = matchesCategory(submission.location, locationFilter);
+
+      return ageMatch && parityMatch && maritalMatch && educationMatch && locationMatch;
+    });
+  }, [
+    descriptiveData,
+    ageFilter,
+    maritalFilter,
+    educationFilter,
+    locationFilter,
+    parityFilter,
+  ]);
+
+  const totalSubmissions = descriptiveData?.submissions.length ?? 0;
+  const filteredCount = filteredSubmissions.length;
+  const isFiltered = [ageFilter, maritalFilter, educationFilter, locationFilter, parityFilter]
+    .some((value) => value !== ALL_FILTER_VALUE);
+  const showFilteredEmpty = Boolean(descriptiveData && isFiltered && filteredCount === 0);
+
+  const demographicSummary = useMemo(() => {
+    if (!descriptiveData || showFilteredEmpty) {
+      return null;
+    }
+
+    const records = filteredSubmissions.length > 0
+      ? filteredSubmissions
+      : descriptiveData.submissions;
+
+    if (records.length === 0) {
+      return null;
+    }
+
+    return {
+      count: records.length,
+      age: computeNumericSummary(records.map((record) => record.age)),
+      parity: computeNumericSummary(records.map((record) => record.parity)),
+      marital: computeCategorySummary(records, (record) => record.maritalStatus),
+      education: computeCategorySummary(records, (record) => record.educationLevel),
+      location: computeCategorySummary(records, (record) => record.location),
+    };
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+
+  const motivationSummaries = useMemo(() => {
+    if (!descriptiveData || showFilteredEmpty) {
+      return null;
+    }
+
+    const records = filteredSubmissions.length > 0
+      ? filteredSubmissions
+      : descriptiveData.submissions;
+
+    return MOTIVATION_SUBDOMAINS.map((definition) => ({
+      definition,
+      summary: computeNumericSummary(records.map((record) => record.motivationItems?.[definition.key] ?? null)),
+    }));
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+
+  const abilitySummaries = useMemo(() => {
+    if (!descriptiveData || showFilteredEmpty) {
+      return null;
+    }
+
+    const records = filteredSubmissions.length > 0
+      ? filteredSubmissions
+      : descriptiveData.submissions;
+
+    return ABILITY_SUBDOMAINS.map((definition) => ({
+      definition,
+      summary: computeNumericSummary(records.map((record) => record.abilityItems?.[definition.key] ?? null)),
+    }));
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+
+  const normSummaries = useMemo(() => {
+    if (!descriptiveData || showFilteredEmpty) {
+      return null;
+    }
+
+    const records = filteredSubmissions.length > 0
+      ? filteredSubmissions
+      : descriptiveData.submissions;
+
+    return {
+      descriptive: computeLikertSummary(records.map((record) => record.descriptiveNorms)),
+      injunctive: computeLikertSummary(records.map((record) => record.injunctiveNorms)),
+    };
+  }, [descriptiveData, filteredSubmissions, showFilteredEmpty]);
+
+  const handleResetFilters = () => {
+    setAgeFilter(ALL_FILTER_VALUE);
+    setMaritalFilter(ALL_FILTER_VALUE);
+    setEducationFilter(ALL_FILTER_VALUE);
+    setLocationFilter(ALL_FILTER_VALUE);
+    setParityFilter(ALL_FILTER_VALUE);
+  };
+
   if (isLoading) {
     return <LoadingState />;
   }
@@ -173,6 +517,99 @@ const DashboardOverview = ({
         ) : null}
       </div>
 
+      {descriptiveData ? (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium text-muted-foreground">Filter respondents</h3>
+              <p className="text-xs text-muted-foreground">
+                Showing {formatNumber(filteredCount, { maximumFractionDigits: 0 })} of {formatNumber(totalSubmissions, { maximumFractionDigits: 0 })} respondents.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              disabled={!isFiltered}
+              className="self-start text-xs text-muted-foreground hover:text-foreground print:hidden"
+            >
+              Clear filters
+            </Button>
+          </div>
+          <div className="grid gap-3 print:hidden md:grid-cols-2 xl:grid-cols-5">
+            <Select value={ageFilter} onValueChange={setAgeFilter} disabled={!filterOptions}>
+              <SelectTrigger className="bg-card/60">
+                <SelectValue placeholder="All ages" />
+              </SelectTrigger>
+              <SelectContent>
+                {(filterOptions?.age ?? []).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={maritalFilter} onValueChange={setMaritalFilter} disabled={!filterOptions}>
+              <SelectTrigger className="bg-card/60">
+                <SelectValue placeholder="All marital statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                {(filterOptions?.marital ?? []).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={educationFilter} onValueChange={setEducationFilter} disabled={!filterOptions}>
+              <SelectTrigger className="bg-card/60">
+                <SelectValue placeholder="All education levels" />
+              </SelectTrigger>
+              <SelectContent>
+                {(filterOptions?.education ?? []).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={locationFilter} onValueChange={setLocationFilter} disabled={!filterOptions}>
+              <SelectTrigger className="bg-card/60">
+                <SelectValue placeholder="All locations" />
+              </SelectTrigger>
+              <SelectContent>
+                {(filterOptions?.location ?? []).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={parityFilter} onValueChange={setParityFilter} disabled={!filterOptions}>
+              <SelectTrigger className="bg-card/60">
+                <SelectValue placeholder="All parity levels" />
+              </SelectTrigger>
+              <SelectContent>
+                {(filterOptions?.parity ?? []).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {showFilteredEmpty ? (
+            <Alert variant="secondary" className="border-border/60 bg-card/60">
+              <AlertTitle>No respondents match the selected filters</AlertTitle>
+              <AlertDescription className="text-sm text-muted-foreground">
+                Adjust one or more filters to widen the selection.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 print:grid-cols-2 print:gap-5">
         {cards.map((card) => {
           const Icon = card.trendIcon;
@@ -204,6 +641,248 @@ const DashboardOverview = ({
           );
         })}
       </div>
+
+      {demographicSummary ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Demographic profile</h3>
+            <span className="text-xs text-muted-foreground">n = {formatNumber(demographicSummary.count, { maximumFractionDigits: 0 })}</span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 print:grid-cols-3">
+            <Card className="relative border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Age</CardTitle>
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Calendar className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p className="text-3xl font-semibold text-foreground">
+                  {formatDecimal(demographicSummary.age.mean, 1)}
+                  <span className="ml-1 text-base font-medium text-muted-foreground">yrs</span>
+                </p>
+                <p>Median {formatDecimal(demographicSummary.age.median, 0)} yrs · SD {formatDecimal(demographicSummary.age.sd, 1)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Valid responses: {formatNumber(demographicSummary.age.count, { maximumFractionDigits: 0 })}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="relative border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Marital status</CardTitle>
+                <div className="rounded-lg bg-rose-100/50 p-2 text-rose-500 dark:bg-rose-500/10 dark:text-rose-400">
+                  <Heart className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p className="text-2xl font-semibold text-foreground">
+                  {demographicSummary.marital.label ?? "n/a"}
+                </p>
+                <p>
+                  {demographicSummary.marital.share != null
+                    ? `${formatPercentage(demographicSummary.marital.share * 100)} of respondents`
+                    : "No responses"}
+                </p>
+                {demographicSummary.marital.unknownCount > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Unknown: {formatNumber(demographicSummary.marital.unknownCount, { maximumFractionDigits: 0 })}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+            <Card className="relative border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Education</CardTitle>
+                <div className="rounded-lg bg-indigo-100/60 p-2 text-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-400">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p className="text-2xl font-semibold text-foreground">
+                  {demographicSummary.education.label ?? "n/a"}
+                </p>
+                <p>
+                  {demographicSummary.education.share != null
+                    ? `${formatPercentage(demographicSummary.education.share * 100)} of respondents`
+                    : "No responses"}
+                </p>
+                {demographicSummary.education.unknownCount > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Unknown: {formatNumber(demographicSummary.education.unknownCount, { maximumFractionDigits: 0 })}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+            <Card className="relative border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Location</CardTitle>
+                <div className="rounded-lg bg-emerald-100/60 p-2 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400">
+                  <MapPin className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p className="text-2xl font-semibold text-foreground">
+                  {demographicSummary.location.label ?? "n/a"}
+                </p>
+                <p>
+                  {demographicSummary.location.share != null
+                    ? `${formatPercentage(demographicSummary.location.share * 100)} of respondents`
+                    : "No responses"}
+                </p>
+                {demographicSummary.location.unknownCount > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Unknown: {formatNumber(demographicSummary.location.unknownCount, { maximumFractionDigits: 0 })}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+            <Card className="relative border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Parity</CardTitle>
+                <div className="rounded-lg bg-amber-100/60 p-2 text-amber-500 dark:bg-amber-500/10 dark:text-amber-500">
+                  <UserPlus className="h-5 w-5" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p className="text-3xl font-semibold text-foreground">
+                  {formatDecimal(demographicSummary.parity.mean, 1)}
+                  <span className="ml-1 text-base font-medium text-muted-foreground">children</span>
+                </p>
+                <p>Median {formatDecimal(demographicSummary.parity.median, 1)} · SD {formatDecimal(demographicSummary.parity.sd, 1)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Valid responses: {formatNumber(demographicSummary.parity.count, { maximumFractionDigits: 0 })}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : null}
+
+      {motivationSummaries && motivationSummaries.some((item) => item.summary.count > 0) ? (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Motivation sub-domains</h3>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 print:grid-cols-2">
+            {motivationSummaries.map(({ definition, summary }) => (
+              <Card key={definition.key} className="relative border-0 bg-card/50 backdrop-blur-sm">
+                <CardHeader className="space-y-1 pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">{definition.title}</CardTitle>
+                  <CardDescription>{definition.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p className="text-2xl font-semibold text-foreground">
+                    {summary.mean != null ? summary.mean.toFixed(2) : "n/a"}
+                    {summary.mean != null ? (
+                      <span className="ml-1 text-sm font-medium text-muted-foreground">/ 5</span>
+                    ) : null}
+                  </p>
+                  <p>Median {formatDecimal(summary.median, 2)} · SD {formatDecimal(summary.sd, 2)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Valid responses: {formatNumber(summary.count, { maximumFractionDigits: 0 })}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {abilitySummaries && abilitySummaries.some((item) => item.summary.count > 0) ? (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Ability sub-domains</h3>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 print:grid-cols-2">
+            {abilitySummaries.map(({ definition, summary }) => (
+              <Card key={definition.key} className="relative border-0 bg-card/50 backdrop-blur-sm">
+                <CardHeader className="space-y-1 pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">{definition.title}</CardTitle>
+                  <CardDescription>{definition.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p className="text-2xl font-semibold text-foreground">
+                    {summary.mean != null ? summary.mean.toFixed(2) : "n/a"}
+                    {summary.mean != null ? (
+                      <span className="ml-1 text-sm font-medium text-muted-foreground">/ 5</span>
+                    ) : null}
+                  </p>
+                  <p>Median {formatDecimal(summary.median, 2)} · SD {formatDecimal(summary.sd, 2)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Valid responses: {formatNumber(summary.count, { maximumFractionDigits: 0 })}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {normSummaries && (normSummaries.descriptive.count > 0 || normSummaries.injunctive.count > 0) ? (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Social norms</h3>
+          <div className="grid gap-4 md:grid-cols-2 print:grid-cols-2">
+            <Card className="relative border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="space-y-1 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Descriptive norms</CardTitle>
+                <CardDescription>Perceived prevalence of contraception use in the community.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p className="text-2xl font-semibold text-foreground">
+                  {normSummaries.descriptive.mean != null ? normSummaries.descriptive.mean.toFixed(2) : "n/a"}
+                  {normSummaries.descriptive.mean != null ? (
+                    <span className="ml-1 text-sm font-medium text-muted-foreground">/ 5</span>
+                  ) : null}
+                </p>
+                <p>Median {formatDecimal(normSummaries.descriptive.median, 2)} · SD {formatDecimal(normSummaries.descriptive.sd, 2)}</p>
+                <p>
+                  High agreement (4–5): {normSummaries.descriptive.positiveShare != null
+                    ? formatPercentage(normSummaries.descriptive.positiveShare * 100)
+                    : "n/a"}
+                </p>
+                {normSummaries.descriptive.topValue != null ? (
+                  <p>
+                    Most common rating: {normSummaries.descriptive.topValue}
+                    {normSummaries.descriptive.topShare != null
+                      ? ` (${formatPercentage(normSummaries.descriptive.topShare * 100)})`
+                      : ""}
+                  </p>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  Valid responses: {formatNumber(normSummaries.descriptive.count, { maximumFractionDigits: 0 })}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="relative border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="space-y-1 pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Injunctive norms</CardTitle>
+                <CardDescription>Perceived approval of contraception by important others.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p className="text-2xl font-semibold text-foreground">
+                  {normSummaries.injunctive.mean != null ? normSummaries.injunctive.mean.toFixed(2) : "n/a"}
+                  {normSummaries.injunctive.mean != null ? (
+                    <span className="ml-1 text-sm font-medium text-muted-foreground">/ 5</span>
+                  ) : null}
+                </p>
+                <p>Median {formatDecimal(normSummaries.injunctive.median, 2)} · SD {formatDecimal(normSummaries.injunctive.sd, 2)}</p>
+                <p>
+                  High approval (4–5): {normSummaries.injunctive.positiveShare != null
+                    ? formatPercentage(normSummaries.injunctive.positiveShare * 100)
+                    : "n/a"}
+                </p>
+                {normSummaries.injunctive.topValue != null ? (
+                  <p>
+                    Most common rating: {normSummaries.injunctive.topValue}
+                    {normSummaries.injunctive.topShare != null
+                      ? ` (${formatPercentage(normSummaries.injunctive.topShare * 100)})`
+                      : ""}
+                  </p>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  Valid responses: {formatNumber(normSummaries.injunctive.count, { maximumFractionDigits: 0 })}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 md:grid-cols-2">
         {(() => {

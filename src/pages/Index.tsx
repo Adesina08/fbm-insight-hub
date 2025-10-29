@@ -351,6 +351,7 @@ const Index = () => {
                 error={analyticsError}
                 onRetry={retryHandler}
                 metadata={overviewMetadata}
+                descriptive={analytics?.descriptive}
               />
             </section>
           </TabsContent>
