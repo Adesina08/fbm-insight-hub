@@ -648,11 +648,7 @@ const DashboardOverview = ({
     return items;
   }, [abilitySummaries, demographicSummary, motivationSummaries, normSummaries]); // ✅
 
-  // Keep deps primitive/stable: baseCards and descriptiveCards are memoized above,
-  // so depending on those identifiers is valid.
-  const cards = useMemo(() => {
-    return baseCards.concat(descriptiveCards);
-  }, [baseCards, descriptiveCards]); // ✅ inline array literal
+  const cards = baseCards.concat(descriptiveCards);
 
   const [activeSlide, setActiveSlide] = useState(0);
 
@@ -665,7 +661,7 @@ const DashboardOverview = ({
     }
 
     return chunks.length > 0 ? chunks : [[]];
-  }, [cards]); // ✅
+  }, [cards.length]);
 
   const hasMultipleSlides = chunkedCards.length > 1;
   const safeActiveSlide = Math.min(activeSlide, chunkedCards.length - 1);
