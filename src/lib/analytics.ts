@@ -1404,7 +1404,7 @@ function determineBucketValue(
   }
 
   const match = definitions.find((definition) => definition.matches(value));
-  return match ? definition.value : DESCRIPTIVE_UNKNOWN_VALUE;
+  return match ? match.value : DESCRIPTIVE_UNKNOWN_VALUE;
 }
 
 function buildAgeFilterOptions(records: DescriptiveSubmission[]): DescriptiveFilterOption[] {
