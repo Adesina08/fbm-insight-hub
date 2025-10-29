@@ -423,29 +423,22 @@ const DashboardOverview = ({
       return;
     }
 
-    const ensureOption = (
-      current: string,
-      options: Array<{ value: string }>,
-      setter: (value: string) => void,
-    ) => {
-      if (!options.some((option) => option.value === current)) {
-        setter(ALL_FILTER_VALUE);
-      }
-    };
-
-    ensureOption(ageFilter, filterOptions.age, setAgeFilter);
-    ensureOption(maritalFilter, filterOptions.marital, setMaritalFilter);
-    ensureOption(educationFilter, filterOptions.education, setEducationFilter);
-    ensureOption(locationFilter, filterOptions.location, setLocationFilter);
-    ensureOption(parityFilter, filterOptions.parity, setParityFilter);
-  }, [
-    filterOptions,
-    ageFilter,
-    maritalFilter,
-    educationFilter,
-    locationFilter,
-    parityFilter,
-  ]);
+    setAgeFilter((current) =>
+      filterOptions.age.some((option) => option.value === current) ? current : ALL_FILTER_VALUE,
+    );
+    setMaritalFilter((current) =>
+      filterOptions.marital.some((option) => option.value === current) ? current : ALL_FILTER_VALUE,
+    );
+    setEducationFilter((current) =>
+      filterOptions.education.some((option) => option.value === current) ? current : ALL_FILTER_VALUE,
+    );
+    setLocationFilter((current) =>
+      filterOptions.location.some((option) => option.value === current) ? current : ALL_FILTER_VALUE,
+    );
+    setParityFilter((current) =>
+      filterOptions.parity.some((option) => option.value === current) ? current : ALL_FILTER_VALUE,
+    );
+  }, [filterOptions]);
 
   const filteredSubmissions = filterSubmissions(descriptiveData, {
     age: ageFilter,
