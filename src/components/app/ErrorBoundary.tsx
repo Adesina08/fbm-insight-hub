@@ -32,9 +32,9 @@ const REACT_ERROR_PATTERNS: Array<{
         return {
           title: "Invalid Hook dependency list",
           description:
-            "React could not initialise a Hook because the dependencies argument was not a plain array. Hooks like useMemo, useCallback and useEffect expect their second argument to be an array literal (for example, []).",
+            "React could not initialise a Hook because the dependencies argument was not a plain inline array. Hooks like useMemo, useCallback and useEffect expect their second argument to be an array literal written directly in place (for example, [foo, bar]).",
           hint:
-            "Inspect recent changes to dependency lists and ensure you always pass an array instead of values such as objects, numbers or undefined. The Index page helpers are a good place to start.",
+            "Inspect recent changes to dependency lists and ensure you keep the array literal inline without spreads, conditionals or helper variables. Split the Hook or guard its body instead of building dependency arrays dynamically.",
         } satisfies DecodedErrorInfo;
       }
       return null;
