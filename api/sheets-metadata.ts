@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import type { Request as FetchRequest } from "undici";
 
 import { handleOptionsRequest, jsonResponse, sendError, setCorsHeaders } from "./_lib/http";
 import {
@@ -100,11 +99,11 @@ function sendJson(res: ServerResponse, payload: SheetInfoResponse): void {
   res.end(JSON.stringify(payload));
 }
 
-function isFetchRequest(req: IncomingMessage | FetchRequest): req is FetchRequest {
-  return typeof (req as FetchRequest).method === "string" && typeof (req as FetchRequest).headers === "object";
+function isFetchRequest(req: IncomingMessage | Request): req is Request {
+  return typeof (req as Request).method === "string" && typeof (req as Request).headers === "object";
 }
 
-async function handleFetchRequest(req: FetchRequest): Promise<Response> {
+async function handleFetchRequest(req: Request): Promise<Response> {
   const optionsResponse = handleOptionsRequest(req);
   if (optionsResponse) {
     return optionsResponse;
@@ -196,7 +195,7 @@ async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Pro
 }
 
 export default async function handler(
-  req: IncomingMessage | FetchRequest,
+  req: IncomingMessage | Request,
   res?: ServerResponse,
 ): Promise<Response | void> {
   if (isFetchRequest(req)) {

@@ -34,8 +34,8 @@ All Likert parsing handles textual phrases (“very easy”, “somewhat difficu
 
 ### FBM Quadrant chart
 
-- Scatter points plot each respondent with valid motivation, ability, and current-use data. Norms overlay averages descriptive and injunctive norms, while the system overlay uses system readiness. Marker size scales linearly with the selected overlay value.【F:src/lib/analytics.ts†L981-L993】【F:src/components/dashboard/FBMQuadrantChart.tsx†L63-L151】
-- Quadrant boundaries are fixed at score 3 for both axes to align with the segmentation thresholds.【F:src/components/dashboard/FBMQuadrantChart.tsx†L152-L207】
+- Scatter points plot each respondent with valid motivation, ability, and current-use data. Norms overlay averages descriptive and injunctive norms, while the system overlay uses system readiness. Marker size scales linearly with the selected overlay value.【F:src/lib/analytics.ts†L981-L993】【F:src/components/dashboard/FBMQuadrantChart.tsx†L102-L205】
+- Quadrant boundaries are fixed at score 3 for both axes to align with the segmentation thresholds.【F:src/components/dashboard/FBMQuadrantChart.tsx†L206-L264】
 
 ### Segment profiles
 
