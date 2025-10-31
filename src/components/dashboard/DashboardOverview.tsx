@@ -404,6 +404,7 @@ const DashboardOverview = ({
   const [educationFilter, setEducationFilter] = useState<string>(ALL_FILTER_VALUE);
   const [locationFilter, setLocationFilter] = useState<string>(ALL_FILTER_VALUE);
   const [parityFilter, setParityFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [activeSlide, setActiveSlide] = useState(0);
 
   const descriptiveData = descriptive ?? null;
 
@@ -520,6 +521,147 @@ const DashboardOverview = ({
     };
   })();
 
+  const cards = (() => {
+    const baseCards = buildBaseCards(stats);
+
+    const descriptiveCards: KpiCard[] = (() => {
+      const items: KpiCard[] = [];
+
+      if (demographicSummary) {
+        items.push(
+          {
+            title: "Mean age",
+            value: formatDecimal(demographicSummary.age.mean, 1),
+            trendIcon: Calendar,
+            suffix: " yrs",
+            gradient: "from-sky-500 to-sky-300/60",
+          },
+          {
+            title: "Top marital status",
+            value: demographicSummary.marital.label ?? "n/a",
+            trendIcon: Heart,
+            suffix:
+              demographicSummary.marital.share != null
+                ? ` · ${formatPercentage(demographicSummary.marital.share * 100)}`
+                : undefined,
+            gradient: "from-rose-500 to-rose-300/60",
+          },
+          {
+            title: "Top education level",
+            value: demographicSummary.education.label ?? "n/a",
+            trendIcon: GraduationCap,
+            suffix:
+              demographicSummary.education.share != null
+                ? ` · ${formatPercentage(demographicSummary.education.share * 100)}`
+                : undefined,
+            gradient: "from-indigo-500 to-indigo-300/60",
+          },
+          {
+            title: "Leading location",
+            value: demographicSummary.location.label ?? "n/a",
+            trendIcon: MapPin,
+            suffix:
+              demographicSummary.location.share != null
+                ? ` · ${formatPercentage(demographicSummary.location.share * 100)}`
+                : undefined,
+            gradient: "from-emerald-500 to-emerald-300/60",
+          },
+          {
+            title: "Mean parity",
+            value: formatDecimal(demographicSummary.parity.mean, 1),
+            trendIcon: UserPlus,
+            suffix: " children",
+            gradient: "from-amber-500 to-amber-300/60",
+          },
+        );
+      }
+
+      const topMotivation = findTopSummary(motivationSummaries);
+      if (topMotivation) {
+        items.push({
+          title: "Strongest motivation",
+          value: topMotivation.definition.title,
+          trendIcon: BarChart3,
+          suffix:
+            topMotivation.summary.mean != null
+              ? ` · ${topMotivation.summary.mean.toFixed(2)}/5`
+              : undefined,
+          gradient: "from-violet-500 to-violet-300/60",
+        });
+      }
+
+      const topAbility = findTopSummary(abilitySummaries);
+      if (topAbility) {
+        items.push({
+          title: "Strongest ability",
+          value: topAbility.definition.title,
+          trendIcon: Zap,
+          suffix:
+            topAbility.summary.mean != null
+              ? ` · ${topAbility.summary.mean.toFixed(2)}/5`
+              : undefined,
+          gradient: "from-orange-500 to-orange-300/60",
+        });
+      }
+
+      if (normSummaries) {
+        items.push(
+          {
+            title: "High descriptive norms",
+            value:
+              normSummaries.descriptive.positiveShare != null
+                ? formatPercentage(normSummaries.descriptive.positiveShare * 100)
+                : "n/a",
+            trendIcon: Network,
+            suffix:
+              normSummaries.descriptive.mean != null
+                ? ` · Avg ${normSummaries.descriptive.mean.toFixed(2)}/5`
+                : undefined,
+            gradient: "from-cyan-500 to-cyan-300/60",
+          },
+          {
+            title: "High injunctive norms",
+            value:
+              normSummaries.injunctive.positiveShare != null
+                ? formatPercentage(normSummaries.injunctive.positiveShare * 100)
+                : "n/a",
+            trendIcon: UserCheck,
+            suffix:
+              normSummaries.injunctive.mean != null
+                ? ` · Avg ${normSummaries.injunctive.mean.toFixed(2)}/5`
+                : undefined,
+            gradient: "from-teal-500 to-teal-300/60",
+          },
+        );
+      }
+
+      return items;
+    })();
+
+    return [...baseCards, ...descriptiveCards];
+  })();
+
+  const chunkedCards = (() => {
+    const chunkSize = 4;
+    const chunks: KpiCard[][] = [];
+
+    for (let index = 0; index < cards.length; index += chunkSize) {
+      chunks.push(cards.slice(index, index + chunkSize));
+    }
+
+    return chunks.length > 0 ? chunks : [[]];
+  })();
+
+  const hasMultipleSlides = chunkedCards.length > 1;
+  const safeActiveSlide = Math.min(activeSlide, chunkedCards.length - 1);
+  const visibleCards = chunkedCards[safeActiveSlide] ?? [];
+
+  useEffect(() => {
+    if (activeSlide !== safeActiveSlide) {
+      setActiveSlide(safeActiveSlide);
+    }
+  }, [activeSlide, safeActiveSlide]);
+
   const handleResetFilters = () => {
     setAgeFilter(ALL_FILTER_VALUE);
     setMaritalFilter(ALL_FILTER_VALUE);
@@ -547,147 +689,6 @@ const DashboardOverview = ({
           secondary: "Data refreshes automatically every minute.",
         }
       : metadata;
-
-  const baseCards = buildBaseCards(stats);
-
-  const descriptiveCards: KpiCard[] = (() => {
-    const items: KpiCard[] = [];
-
-    if (demographicSummary) {
-      items.push(
-        {
-          title: "Mean age",
-          value: formatDecimal(demographicSummary.age.mean, 1),
-          trendIcon: Calendar,
-          suffix: " yrs",
-          gradient: "from-sky-500 to-sky-300/60",
-        },
-        {
-          title: "Top marital status",
-          value: demographicSummary.marital.label ?? "n/a",
-          trendIcon: Heart,
-          suffix:
-            demographicSummary.marital.share != null
-              ? ` · ${formatPercentage(demographicSummary.marital.share * 100)}`
-              : undefined,
-          gradient: "from-rose-500 to-rose-300/60",
-        },
-        {
-          title: "Top education level",
-          value: demographicSummary.education.label ?? "n/a",
-          trendIcon: GraduationCap,
-          suffix:
-            demographicSummary.education.share != null
-              ? ` · ${formatPercentage(demographicSummary.education.share * 100)}`
-              : undefined,
-          gradient: "from-indigo-500 to-indigo-300/60",
-        },
-        {
-          title: "Leading location",
-          value: demographicSummary.location.label ?? "n/a",
-          trendIcon: MapPin,
-          suffix:
-            demographicSummary.location.share != null
-              ? ` · ${formatPercentage(demographicSummary.location.share * 100)}`
-              : undefined,
-          gradient: "from-emerald-500 to-emerald-300/60",
-        },
-        {
-          title: "Mean parity",
-          value: formatDecimal(demographicSummary.parity.mean, 1),
-          trendIcon: UserPlus,
-          suffix: " children",
-          gradient: "from-amber-500 to-amber-300/60",
-        },
-      );
-    }
-
-    const topMotivation = findTopSummary(motivationSummaries);
-    if (topMotivation) {
-      items.push({
-        title: "Strongest motivation",
-        value: topMotivation.definition.title,
-        trendIcon: BarChart3,
-        suffix:
-          topMotivation.summary.mean != null
-            ? ` · ${topMotivation.summary.mean.toFixed(2)}/5`
-            : undefined,
-        gradient: "from-violet-500 to-violet-300/60",
-      });
-    }
-
-    const topAbility = findTopSummary(abilitySummaries);
-    if (topAbility) {
-      items.push({
-        title: "Strongest ability",
-        value: topAbility.definition.title,
-        trendIcon: Zap,
-        suffix:
-          topAbility.summary.mean != null
-            ? ` · ${topAbility.summary.mean.toFixed(2)}/5`
-            : undefined,
-        gradient: "from-orange-500 to-orange-300/60",
-      });
-    }
-
-    if (normSummaries) {
-      items.push(
-        {
-          title: "High descriptive norms",
-          value:
-            normSummaries.descriptive.positiveShare != null
-              ? formatPercentage(normSummaries.descriptive.positiveShare * 100)
-              : "n/a",
-          trendIcon: Network,
-          suffix:
-            normSummaries.descriptive.mean != null
-              ? ` · Avg ${normSummaries.descriptive.mean.toFixed(2)}/5`
-              : undefined,
-          gradient: "from-cyan-500 to-cyan-300/60",
-        },
-        {
-          title: "High injunctive norms",
-          value:
-            normSummaries.injunctive.positiveShare != null
-              ? formatPercentage(normSummaries.injunctive.positiveShare * 100)
-              : "n/a",
-          trendIcon: UserCheck,
-          suffix:
-            normSummaries.injunctive.mean != null
-              ? ` · Avg ${normSummaries.injunctive.mean.toFixed(2)}/5`
-              : undefined,
-          gradient: "from-teal-500 to-teal-300/60",
-        },
-      );
-    }
-
-    return items;
-  })();
-
-  const cards = [...baseCards, ...descriptiveCards];
-
-  const [activeSlide, setActiveSlide] = useState(0);
-
-  const chunkedCards = (() => {
-    const chunkSize = 4;
-    const chunks: KpiCard[][] = [];
-
-    for (let index = 0; index < cards.length; index += chunkSize) {
-      chunks.push(cards.slice(index, index + chunkSize));
-    }
-
-    return chunks.length > 0 ? chunks : [[]];
-  })();
-
-  const hasMultipleSlides = chunkedCards.length > 1;
-  const safeActiveSlide = Math.min(activeSlide, chunkedCards.length - 1);
-  const visibleCards = chunkedCards[safeActiveSlide] ?? [];
-
-  useEffect(() => {
-    if (activeSlide !== safeActiveSlide) {
-      setActiveSlide(safeActiveSlide);
-    }
-  }, [activeSlide, safeActiveSlide]);
 
   return (
     <div className="space-y-8 animate-fade-in print:space-y-10">
