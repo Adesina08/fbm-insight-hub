@@ -4,6 +4,7 @@ import { BarChart3, Users, Target, Zap, Network, Loader2 } from "lucide-react";
 import DashboardOverview, { type DashboardOverviewMetadata } from "@/components/dashboard/DashboardOverview";
 import FBMQuadrantChart from "@/components/dashboard/FBMQuadrantChart";
 import FBMQuadrantDistribution from "@/components/dashboard/FBMQuadrantDistribution";
+import FBMSegmentHighlights from "@/components/dashboard/FBMSegmentHighlights";
 import SegmentProfiles from "@/components/dashboard/SegmentProfiles";
 import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivenessHeatmap";
 import PathDiagram from "@/components/dashboard/PathDiagram";
@@ -445,6 +446,7 @@ const Index = () => {
                   isLoading={isAnalyticsLoading}
                   error={analyticsError}
                 />
+                <FBMSegmentHighlights quadrants={analytics?.quadrants} />
               </div>
             </section>
           </TabsContent>
