@@ -19,6 +19,8 @@ import {
   BarChart3,
   Network,
   UserCheck,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   DESCRIPTIVE_UNKNOWN_VALUE,
