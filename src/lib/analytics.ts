@@ -824,6 +824,9 @@ export interface DescriptiveSubmission {
   location: DescriptiveCategoryValue | null;
   parity: number | null;
   parityBucket: string | null;
+  motivation: number | null;
+  ability: number | null;
+  currentUse: boolean | null;
   motivationItems: Partial<Record<MotivationSubdomainId, number | null>>;
   abilityItems: Partial<Record<AbilitySubdomainId, number | null>>;
   descriptiveNorms: number | null;
@@ -1293,6 +1296,9 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
       location,
       parity: submission.profile.parity,
       parityBucket,
+      motivation: submission.motivation,
+      ability: submission.ability,
+      currentUse: submission.currentUse,
       motivationItems: submission.motivationItems,
       abilityItems: submission.abilityItems,
       descriptiveNorms: submission.descriptiveNorms,

@@ -12,3 +12,16 @@ export const formatAverage = (value: number | null | undefined) => {
 };
 
 export const formatPercentage = (value: number) => `${value.toFixed(0)}%`;
+
+export const formatLastUpdated = (timestamp?: string) => {
+  if (!timestamp) {
+    return "Never";
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleString();
+};
