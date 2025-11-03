@@ -137,6 +137,38 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
     return total / values.length;
   };
 
+  const extractValues = (key: "ability" | "motivation"): number[] =>
+    points
+      .map((point) => point[key])
+      .filter((value): value is number => value != null && Number.isFinite(value));
+
+  const createDomain = (values: number[], fallback: [number, number]): [number, number] => {
+    if (values.length === 0) {
+      return fallback;
+    }
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return fallback;
+    }
+
+    const range = max - min;
+    const padding = Math.max(range * 0.1, 0.4);
+    const lowerBound = Math.max(0, min - padding);
+    const upperBound = max + padding;
+
+    if (lowerBound === upperBound) {
+      return [Math.max(0, lowerBound - 1), upperBound + 1];
+    }
+
+    return [lowerBound, upperBound];
+  };
+
+  const abilityDomain = createDomain(extractValues("ability"), [0, 5.5]);
+  const motivationDomain = createDomain(extractValues("motivation"), [0, 5.5]);
+
   const mapPoint = (point: ScatterPoint, segment: ChartPoint["segment"]): ChartPoint => {
     const overlayValue = computeOverlayAverage(point);
     return {
@@ -255,7 +287,7 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
                 <XAxis
                   type="number"
                   dataKey="x"
-                  domain={[0, 5.5]}
+                  domain={abilityDomain}
                   tick={{ fill: "#475569", fontSize: 12 }}
                   tickCount={6}
                   label={{ value: "Ability Score", position: "bottom", offset: 25, style: { fill: "#0f172a", fontSize: 16 } }}
@@ -263,7 +295,7 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
                 <YAxis
                   type="number"
                   dataKey="y"
-                  domain={[0, 5.5]}
+                  domain={motivationDomain}
                   tick={{ fill: "#475569", fontSize: 12 }}
                   tickCount={6}
                   label={{

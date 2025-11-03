@@ -348,26 +348,26 @@ const Index = () => {
       <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm print-container print:border-primary/30 print:bg-gradient-to-r print:from-primary/12 print:to-chart-3/10 print:shadow-none">
         <div className="container mx-auto px-6 py-5 max-w-7xl">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-5">
               <img
                 src="/images/inicio-logo.png"
                 alt="Inicio logo"
-                className="h-16 w-auto object-contain print:h-14"
+                className="h-20 w-auto object-contain sm:h-24 print:h-16"
               />
-              <div className="space-y-1">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent print:text-transparent print:bg-gradient-to-r print:from-primary/80 print:to-chart-3/80">
+              <div className="space-y-1.5">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent sm:text-4xl print:text-transparent print:bg-gradient-to-r print:from-primary/80 print:to-chart-3/80">
                   Inicio BEHAV360
                 </h1>
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary/80 print:text-primary/70">
+                <p className="text-sm font-semibold uppercase tracking-wide text-primary/80 sm:text-base print:text-primary/70">
                   A 360° Diagnostic of Behavior Drivers and Barriers
                 </p>
-                <p className="text-sm text-muted-foreground font-medium print:text-slate-600">{syncStatus}</p>
+                <p className="text-sm text-muted-foreground font-medium sm:text-base print:text-slate-600">{syncStatus}</p>
                 {isLiveMode ? (
                   <>
-                    <p className="text-xs text-muted-foreground print:text-slate-500">
+                    <p className="text-xs text-muted-foreground sm:text-sm print:text-slate-500">
                       Last data sync: {lastSyncLabel}
                     </p>
-                    <p className="text-xs text-muted-foreground print:text-slate-500">
+                    <p className="text-xs text-muted-foreground sm:text-sm print:text-slate-500">
                       Data refreshes automatically every minute.
                     </p>
                   </>
