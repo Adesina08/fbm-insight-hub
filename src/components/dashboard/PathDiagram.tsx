@@ -709,11 +709,18 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
                 })}
               </g>
             </svg>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Green connectors emphasize reinforcing pathways where prompts and psychosocial drivers combine to increase
-              contraceptive use, while the red arrows flag inhibiting relationships that may dampen progress and warrant
-              targeted attention.
-            </p>
+            <div className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                The diagram traces how prompts on the left activate psychosocial drivers in the centre, which in turn feed
+                into the contraceptive use outcome on the right. Each node summarises the average score and supporting
+                evidence for that construct so you can spot which drivers are comparatively stronger or weaker.
+              </p>
+              <p>
+                Connectors are colour-coded to convey direction: green arcs indicate positive coefficients that reinforce
+                progress, while red arcs denote negative relationships that suppress momentum. Thicker lines signal
+                stronger effect sizes, helping you quickly see which pathways merit amplification or mitigation.
+              </p>
+            </div>
           </div>
           <div className="space-y-6">
             {summary && summary.length > 0 ? (
