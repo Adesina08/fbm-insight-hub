@@ -404,7 +404,6 @@ const DashboardOverview = ({
   const [educationFilter, setEducationFilter] = useState<string>(ALL_FILTER_VALUE);
   const [locationFilter, setLocationFilter] = useState<string>(ALL_FILTER_VALUE);
   const [parityFilter, setParityFilter] = useState<string>(ALL_FILTER_VALUE);
-  const [activeSlide, setActiveSlide] = useState(0);
 
   const descriptiveData = descriptive ?? null;
 
@@ -641,26 +640,6 @@ const DashboardOverview = ({
     return [...baseCards, ...descriptiveCards];
   })();
 
-  const chunkedCards = (() => {
-    const chunkSize = 4;
-    const chunks: KpiCard[][] = [];
-
-    for (let index = 0; index < cards.length; index += chunkSize) {
-      chunks.push(cards.slice(index, index + chunkSize));
-    }
-
-    return chunks.length > 0 ? chunks : [[]];
-  })();
-
-  const hasMultipleSlides = chunkedCards.length > 1;
-  const safeActiveSlide = Math.min(activeSlide, chunkedCards.length - 1);
-  const visibleCards = chunkedCards[safeActiveSlide] ?? [];
-
-  useEffect(() => {
-    if (activeSlide !== safeActiveSlide) {
-      setActiveSlide(safeActiveSlide);
-    }
-  }, [activeSlide, safeActiveSlide]);
 
   const handleResetFilters = () => {
     setAgeFilter(ALL_FILTER_VALUE);
@@ -745,7 +724,7 @@ const DashboardOverview = ({
                 <SelectContent>
                   {(filterOptions?.age ?? []).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -759,7 +738,7 @@ const DashboardOverview = ({
                 <SelectContent>
                   {(filterOptions?.marital ?? []).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -773,7 +752,7 @@ const DashboardOverview = ({
                 <SelectContent>
                   {(filterOptions?.education ?? []).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -787,7 +766,7 @@ const DashboardOverview = ({
                 <SelectContent>
                   {(filterOptions?.location ?? []).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -801,7 +780,7 @@ const DashboardOverview = ({
                 <SelectContent>
                   {(filterOptions?.parity ?? []).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label} · {formatNumber(option.count, { maximumFractionDigits: 0 })}
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -819,39 +798,8 @@ const DashboardOverview = ({
         </div>
       ) : null}
 
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-3 print:hidden">
-        {hasMultipleSlides ? (
-          <div className="flex items-center gap-3 rounded-full border border-border/60 bg-card/60 px-3 py-1 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">KPI set {activeSlide + 1}</span>
-            <span className="text-muted-foreground">of {chunkedCards.length}</span>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setActiveSlide((current) => Math.max(0, current - 1))}
-                disabled={activeSlide === 0}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setActiveSlide((current) => Math.min(chunkedCards.length - 1, current + 1))}
-                disabled={activeSlide >= chunkedCards.length - 1}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 print:hidden">
-        {visibleCards.map((card) => {
+        {cards.map((card) => {
           const Icon = card.trendIcon;
           return (
             <Card
@@ -909,75 +857,6 @@ const DashboardOverview = ({
             </Card>
           );
         })}
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        {(() => {
-          const opportunityQuadrant = quadrants
-            .filter((quadrant) => (quadrant.avgAbility ?? 0) < 3)
-            .sort((a, b) => b.count - a.count)[0] ?? quadrants[0];
-          const momentumQuadrant = quadrants
-            .filter((quadrant) => (quadrant.avgMotivation ?? 0) >= 3 && (quadrant.avgAbility ?? 0) >= 3)
-            .sort((a, b) => (b.currentUseRate ?? 0) - (a.currentUseRate ?? 0))[0] ?? quadrants[0];
-
-          return (
-            <>
-              <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm hover:shadow-2xl transition-all">
-                <CardHeader className="pb-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 rounded-lg bg-gradient-to-br from-chart-2 to-chart-2/70 shadow-md">
-                      <Activity className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">Opportunity Segment</CardTitle>
-                      <CardDescription>Largest group with ability barriers</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm text-muted-foreground">
-                  <p>
-                    <span className="font-semibold text-foreground">{opportunityQuadrant.label}</span> accounts for
-                    {" "}{formatNumber(opportunityQuadrant.count)} respondents
-                    ({formatPercentage(opportunityQuadrant.percentage)}). Average ability is
-                    {" "}{formatAverage(opportunityQuadrant.avgAbility)} with a current use rate of
-                    {" "}{opportunityQuadrant.currentUseRate == null
-                      ? "n/a"
-                      : formatPercentage(opportunityQuadrant.currentUseRate * 100)}.
-                  </p>
-                  <p>
-                    Focus on facilitator prompts and system improvements to unlock this group. Remove logistical barriers while
-                    maintaining the motivation already present.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-xl bg-card/50 backdrop-blur-sm hover:shadow-2xl transition-all">
-                <CardHeader className="pb-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2.5 rounded-lg bg-gradient-to-br from-quadrant-high-m-high-a to-quadrant-high-m-high-a/70 shadow-md">
-                      <TrendingUp className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">Momentum Segment</CardTitle>
-                      <CardDescription>Where prompts can reinforce success</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm text-muted-foreground">
-                  <p>
-                    <span className="font-semibold text-foreground">{momentumQuadrant.label}</span> shows the highest current use
-                    rate at {momentumQuadrant.currentUseRate == null ? "n/a" : formatPercentage(momentumQuadrant.currentUseRate * 100)}
-                    with motivation averaging {formatAverage(momentumQuadrant.avgMotivation)}. Maintain behaviour with light-touch signal prompts and peer-led storytelling.
-                  </p>
-                  <p>
-                    Monitor this cohort as an early indicator of system performance—declines often appear here first when
-                    service quality dips.
-                  </p>
-                </CardContent>
-              </Card>
-            </>
-          );
-        })()}
       </div>
     </div>
   );
