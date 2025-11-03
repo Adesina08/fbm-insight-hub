@@ -709,6 +709,11 @@ const PathDiagram = ({ regression, summary, isLoading = false, error }: PathDiag
                 })}
               </g>
             </svg>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Green connectors emphasize reinforcing pathways where prompts and psychosocial drivers combine to increase
+              contraceptive use, while the red arrows flag inhibiting relationships that may dampen progress and warrant
+              targeted attention.
+            </p>
           </div>
           <div className="space-y-6">
             {summary && summary.length > 0 ? (

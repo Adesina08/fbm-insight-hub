@@ -356,8 +356,11 @@ const Index = () => {
               />
               <div className="space-y-1">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent print:text-transparent print:bg-gradient-to-r print:from-primary/80 print:to-chart-3/80">
-                  Behavioural Survey Solution
+                  Inicio BEHAV360
                 </h1>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary/80 print:text-primary/70">
+                  A 360° Diagnostic of Behavior Drivers and Barriers
+                </p>
                 <p className="text-sm text-muted-foreground font-medium print:text-slate-600">{syncStatus}</p>
                 {isLiveMode ? (
                   <>

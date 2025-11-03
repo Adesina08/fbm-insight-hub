@@ -61,18 +61,17 @@ const EmptyState = () => (
 const createMarkerSize = (value: number | null) => 6 + (value ?? 0) * 3;
 
 const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChartProps) => {
-  const [overlaySelection, setOverlaySelection] = useState<OverlayOption[]>(["norms"]);
+  const [overlaySelection, setOverlaySelection] = useState<OverlayOption>("norms");
 
-  const normalizedSelection = overlaySelection.length > 0 ? overlaySelection : ["norms"];
+  const normalizedSelection: OverlayOption[] = [overlaySelection];
 
-  const handleOverlayChange = (values: string[]) => {
-    const validValues = values.filter((value): value is OverlayOption => value === "norms" || value === "system");
-    if (validValues.length === 0) {
-      setOverlaySelection(["norms"]);
+  const handleOverlayChange = (value: string) => {
+    if (value === "norms" || value === "system") {
+      setOverlaySelection(value);
       return;
     }
 
-    setOverlaySelection(validValues);
+    setOverlaySelection("norms");
   };
 
   if (isLoading) {
@@ -197,7 +196,7 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
                 Overlays
               </span>
               <ToggleGroup
-                type="multiple"
+                type="single"
                 value={overlaySelection}
                 onValueChange={handleOverlayChange}
                 className="flex flex-wrap justify-end gap-2"
