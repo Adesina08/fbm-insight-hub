@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { parseUploadedDataset } from "@/lib/uploadAnalytics";
 import type { DashboardAnalytics } from "@/lib/googleSheets";
+import { formatLastUpdated } from "@/lib/dashboardFormatters";
 
 type DataMode = "live" | "upload";
 
@@ -177,6 +178,8 @@ const Index = () => {
     uploadedAnalytics,
     uploadedFile,
   });
+
+  const lastSyncLabel = formatLastUpdated(analytics?.lastUpdated);
 
   const handleConfirmMode = () => {
     if (pendingMode === "live" || pendingMode === "upload") {
@@ -355,8 +358,17 @@ const Index = () => {
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-chart-3 bg-clip-text text-transparent print:text-transparent print:bg-gradient-to-r print:from-primary/80 print:to-chart-3/80">
                   Behavioural Survey Solution
                 </h1>
-                <p className="text-sm text-muted-foreground font-medium print:text-slate-600"> </p>
-                <p className="text-xs text-muted-foreground mt-1 print:text-slate-500">{syncStatus}</p>
+                <p className="text-sm text-muted-foreground font-medium print:text-slate-600">{syncStatus}</p>
+                {isLiveMode ? (
+                  <>
+                    <p className="text-xs text-muted-foreground print:text-slate-500">
+                      Last data sync: {lastSyncLabel}
+                    </p>
+                    <p className="text-xs text-muted-foreground print:text-slate-500">
+                      Data refreshes automatically every minute.
+                    </p>
+                  </>
+                ) : null}
               </div>
             </div>
             <div className="no-print flex items-center gap-3">
@@ -413,7 +425,6 @@ const Index = () => {
               <DashboardOverview
                 stats={analytics?.stats}
                 quadrants={analytics?.quadrants}
-                lastUpdated={analytics?.lastUpdated}
                 isLoading={isAnalyticsLoading}
                 error={analyticsError}
                 onRetry={retryHandler}
@@ -436,13 +447,13 @@ const Index = () => {
                 <span className="print-section-badge">FBM</span>
               </div>
               <div className="space-y-6">
-                <FBMQuadrantDistribution
-                  quadrants={analytics?.quadrants}
+                <FBMQuadrantChart
+                  points={analytics?.scatter}
                   isLoading={isAnalyticsLoading}
                   error={analyticsError}
                 />
-                <FBMQuadrantChart
-                  points={analytics?.scatter}
+                <FBMQuadrantDistribution
+                  quadrants={analytics?.quadrants}
                   isLoading={isAnalyticsLoading}
                   error={analyticsError}
                 />

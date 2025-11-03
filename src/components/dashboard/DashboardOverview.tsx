@@ -138,20 +138,72 @@ const selectRecords = (
   return descriptiveData.submissions;
 };
 
-const buildBaseCards = (stats: DashboardAnalytics["stats"] | undefined): KpiCard[] => {
-  const averageMotivation = stats?.averageMotivation?.value;
-  const averageAbility = stats?.averageAbility?.value;
+interface OverviewStatsSnapshot {
+  totalRespondents: number | null;
+  currentUsers: number | null;
+  averageMotivation: number | null;
+  averageAbility: number | null;
+}
+
+const DEFAULT_STATS_SNAPSHOT: OverviewStatsSnapshot = {
+  totalRespondents: null,
+  currentUsers: null,
+  averageMotivation: null,
+  averageAbility: null,
+};
+
+const computeMeanValue = (values: Array<number | null | undefined>): number | null => {
+  const numeric = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (numeric.length === 0) {
+    return null;
+  }
+
+  const total = numeric.reduce((sum, value) => sum + value, 0);
+  return total / numeric.length;
+};
+
+const buildStatsSnapshot = (
+  stats: DashboardAnalytics["stats"] | undefined,
+  records: DescriptiveSubmission[] | null,
+): OverviewStatsSnapshot => {
+  if (records && records.length > 0) {
+    const motivationAverage = computeMeanValue(records.map((record) => record.motivation));
+    const abilityAverage = computeMeanValue(records.map((record) => record.ability));
+    const currentUsers = records.filter((record) => record.currentUse === true).length;
+
+    return {
+      totalRespondents: records.length,
+      currentUsers,
+      averageMotivation: motivationAverage,
+      averageAbility: abilityAverage,
+    } satisfies OverviewStatsSnapshot;
+  }
+
+  if (!stats) {
+    return DEFAULT_STATS_SNAPSHOT;
+  }
+
+  return {
+    totalRespondents: stats.totalRespondents.value ?? null,
+    currentUsers: stats.currentUsers.value ?? null,
+    averageMotivation: stats.averageMotivation.value ?? null,
+    averageAbility: stats.averageAbility.value ?? null,
+  } satisfies OverviewStatsSnapshot;
+};
+
+const buildBaseCards = (snapshot: OverviewStatsSnapshot): KpiCard[] => {
+  const { averageMotivation, averageAbility } = snapshot;
 
   return [
     {
       title: "Total Respondents",
-      value: formatNumber(stats?.totalRespondents?.value),
+      value: formatNumber(snapshot.totalRespondents),
       trendIcon: Users,
       gradient: "from-chart-1 to-chart-1/60",
     },
     {
       title: "Contraceptive Users",
-      value: formatNumber(stats?.currentUsers?.value),
+      value: formatNumber(snapshot.currentUsers),
       trendIcon: Target,
       gradient: "from-chart-2 to-chart-2/60",
     },
@@ -336,13 +388,6 @@ const ABILITY_SUBDOMAINS: ReadonlyArray<{
   { key: "D6", title: "Self-efficacy", description: "Confidence in using a method correctly." },
 ] as const;
 
-const lastUpdatedLabel = (timestamp?: string) => {
-  if (!timestamp) return "Never";
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return "Unknown";
-  return date.toLocaleString();
-};
-
 const LoadingState = () => (
   <div className="space-y-8 animate-fade-in">
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -392,7 +437,6 @@ const ErrorState = ({ message, onRetry }: { message: string; onRetry?: () => voi
 const DashboardOverview = ({
   stats,
   quadrants,
-  lastUpdated,
   isLoading = false,
   error,
   onRetry,
@@ -454,24 +498,28 @@ const DashboardOverview = ({
     .some((value) => value !== ALL_FILTER_VALUE);
   const showFilteredEmpty = Boolean(descriptiveData && isFiltered && filteredCount === 0);
 
-  const demographicSummary = (() => {
+  const activeRecords = (() => {
     if (!descriptiveData || showFilteredEmpty) {
-      return null;
+      return [] as DescriptiveSubmission[];
     }
 
-    const records = selectRecords(descriptiveData, filteredSubmissions);
+    return selectRecords(descriptiveData, filteredSubmissions);
+  })();
 
-    if (records.length === 0) {
+  const shouldUseFilteredStats = Boolean(descriptiveData && isFiltered && !showFilteredEmpty);
+  const statsSnapshot = buildStatsSnapshot(stats, shouldUseFilteredStats ? filteredSubmissions : null);
+
+  const demographicSummary = (() => {
+    if (activeRecords.length === 0) {
       return null;
     }
-
     return {
-      count: records.length,
-      age: computeNumericSummary(records.map((record) => record.age)),
-      parity: computeNumericSummary(records.map((record) => record.parity)),
-      marital: computeCategorySummary(records, (record) => record.maritalStatus),
-      education: computeCategorySummary(records, (record) => record.educationLevel),
-      location: computeCategorySummary(records, (record) => record.location),
+      count: activeRecords.length,
+      age: computeNumericSummary(activeRecords.map((record) => record.age)),
+      parity: computeNumericSummary(activeRecords.map((record) => record.parity)),
+      marital: computeCategorySummary(activeRecords, (record) => record.maritalStatus),
+      education: computeCategorySummary(activeRecords, (record) => record.educationLevel),
+      location: computeCategorySummary(activeRecords, (record) => record.location),
     };
   })();
 
@@ -479,15 +527,14 @@ const DashboardOverview = ({
     definition: (typeof MOTIVATION_SUBDOMAINS)[number];
     summary: NumericSummary;
   }> | null = (() => {
-    if (!descriptiveData || showFilteredEmpty) {
+    if (activeRecords.length === 0) {
       return null;
     }
-
-    const records = selectRecords(descriptiveData, filteredSubmissions);
-
     return MOTIVATION_SUBDOMAINS.map((definition) => ({
       definition,
-      summary: computeNumericSummary(records.map((record) => record.motivationItems?.[definition.key] ?? null)),
+      summary: computeNumericSummary(
+        activeRecords.map((record) => record.motivationItems?.[definition.key] ?? null),
+      ),
     }));
   })();
 
@@ -495,33 +542,30 @@ const DashboardOverview = ({
     definition: (typeof ABILITY_SUBDOMAINS)[number];
     summary: NumericSummary;
   }> | null = (() => {
-    if (!descriptiveData || showFilteredEmpty) {
+    if (activeRecords.length === 0) {
       return null;
     }
-
-    const records = selectRecords(descriptiveData, filteredSubmissions);
-
     return ABILITY_SUBDOMAINS.map((definition) => ({
       definition,
-      summary: computeNumericSummary(records.map((record) => record.abilityItems?.[definition.key] ?? null)),
+      summary: computeNumericSummary(
+        activeRecords.map((record) => record.abilityItems?.[definition.key] ?? null),
+      ),
     }));
   })();
 
   const normSummaries = (() => {
-    if (!descriptiveData || showFilteredEmpty) {
+    if (activeRecords.length === 0) {
       return null;
     }
 
-    const records = selectRecords(descriptiveData, filteredSubmissions);
-
     return {
-      descriptive: computeLikertSummary(records.map((record) => record.descriptiveNorms)),
-      injunctive: computeLikertSummary(records.map((record) => record.injunctiveNorms)),
+      descriptive: computeLikertSummary(activeRecords.map((record) => record.descriptiveNorms)),
+      injunctive: computeLikertSummary(activeRecords.map((record) => record.injunctiveNorms)),
     };
   })();
 
   const cards = (() => {
-    const baseCards = buildBaseCards(stats);
+    const baseCards = buildBaseCards(statsSnapshot);
 
     const descriptiveCards: KpiCard[] = (() => {
       const items: KpiCard[] = [];
@@ -662,38 +706,37 @@ const DashboardOverview = ({
   }
 
   const metadataContent: DashboardOverviewMetadata | null =
-    metadata === undefined
-      ? {
-          primary: `Last data sync: ${lastUpdatedLabel(lastUpdated)}`,
-          secondary: "Data refreshes automatically every minute.",
-        }
-      : metadata;
+    metadata === undefined ? null : metadata ?? null;
+
+  const showMetadataBanner = Boolean(metadataContent);
 
   return (
     <div className="space-y-8 animate-fade-in print:space-y-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
-        {metadataContent ? (
+      {showMetadataBanner ? (
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between print:flex-row print:items-center print:justify-between print:gap-6 print:rounded-xl print:border print:border-slate-200/80 print:bg-white/80 print:p-5 print:shadow-sm">
           <div>
             <p className="text-sm text-muted-foreground print:text-slate-600">
-              {metadataContent.primary}
+              {metadataContent?.primary}
             </p>
-            {metadataContent.secondary ? (
+            {metadataContent?.secondary ? (
               <p className="text-xs text-muted-foreground print:text-slate-500">{metadataContent.secondary}</p>
             ) : null}
           </div>
-        ) : null}
-        {onRetry ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRetry}
-            className="flex items-center gap-2 print:hidden"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refresh now
-          </Button>
-        ) : null}
-      </div>
+          {/*
+          {onRetry ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRetry}
+              className="flex items-center gap-2 print:hidden"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh now
+            </Button>
+          ) : null}
+          */}
+        </div>
+      ) : null}
 
       {descriptiveData ? (
         <div className="mx-auto w-full max-w-6xl space-y-4 rounded-xl border border-border/40 bg-card/50 p-4 shadow-sm print:hidden">

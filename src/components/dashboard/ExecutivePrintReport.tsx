@@ -1,5 +1,6 @@
 import type { DashboardAnalytics } from "@/lib/googleSheets";
 import type { DashboardOverviewMetadata } from "@/components/dashboard/DashboardOverview";
+import { formatLastUpdated } from "@/lib/dashboardFormatters";
 
 interface ExecutivePrintReportProps {
   analytics: DashboardAnalytics | null;
@@ -38,19 +39,6 @@ const formatRate = (value: number | null | undefined) => {
     return "n/a";
   }
   return `${(value * 100).toFixed(0)}%`;
-};
-
-const formatLastUpdated = (timestamp?: string) => {
-  if (!timestamp) {
-    return "Never";
-  }
-
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
-
-  return date.toLocaleString();
 };
 
 const STRENGTH_ORDER: Record<string, number> = {

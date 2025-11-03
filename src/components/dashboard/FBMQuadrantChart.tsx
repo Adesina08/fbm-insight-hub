@@ -13,10 +13,10 @@ import {
   ZAxis,
   type TooltipProps,
 } from "recharts";
-import { Target, Info } from "lucide-react";
+import { Target } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ScatterPoint } from "@/lib/googleSheets";
 
@@ -30,9 +30,20 @@ interface ChartPoint extends ScatterPoint {
   x: number;
   y: number;
   size: number;
-  overlayValue: number | null;
   segment: "Current User" | "Non-User";
 }
+
+type OverlayOption = "norms" | "system";
+
+const OVERLAY_DEFINITIONS: ReadonlyArray<{ value: OverlayOption; label: string }> = [
+  { value: "norms", label: "Social Norms Overlay" },
+  { value: "system", label: "System Readiness Overlay" },
+] as const;
+
+const OVERLAY_LABELS: Record<OverlayOption, string> = {
+  norms: "Social Norms",
+  system: "System Readiness",
+};
 
 const LoadingState = () => (
   <div className="space-y-4">
@@ -50,7 +61,19 @@ const EmptyState = () => (
 const createMarkerSize = (value: number | null) => 6 + (value ?? 0) * 3;
 
 const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChartProps) => {
-  const [overlayType, setOverlayType] = useState<"norms" | "system">("norms");
+  const [overlaySelection, setOverlaySelection] = useState<OverlayOption[]>(["norms"]);
+
+  const normalizedSelection = overlaySelection.length > 0 ? overlaySelection : ["norms"];
+
+  const handleOverlayChange = (values: string[]) => {
+    const validValues = values.filter((value): value is OverlayOption => value === "norms" || value === "system");
+    if (validValues.length === 0) {
+      setOverlaySelection(["norms"]);
+      return;
+    }
+
+    setOverlaySelection(validValues);
+  };
 
   if (isLoading) {
     return (
@@ -101,17 +124,27 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
 
   const users = points.filter((point) => point.currentUse);
   const nonUsers = points.filter((point) => !point.currentUse);
-  const overlayLabel = overlayType === "norms" ? "Average Norms" : "System Readiness";
-  const overlayKey = overlayType === "norms" ? "norms" : "system";
+
+  const computeOverlayAverage = (point: ScatterPoint): number | null => {
+    const values = normalizedSelection
+      .map((key) => point[key])
+      .filter((value): value is number => value != null && Number.isFinite(value));
+
+    if (values.length === 0) {
+      return null;
+    }
+
+    const total = values.reduce((sum, value) => sum + value, 0);
+    return total / values.length;
+  };
 
   const mapPoint = (point: ScatterPoint, segment: ChartPoint["segment"]): ChartPoint => {
-    const overlayValue = point[overlayKey];
+    const overlayValue = computeOverlayAverage(point);
     return {
       ...point,
       x: point.ability,
       y: point.motivation,
       size: createMarkerSize(overlayValue),
-      overlayValue,
       segment,
     };
   };
@@ -131,11 +164,14 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
         <p className="font-medium text-foreground">{data.segment}</p>
         <p className="text-muted-foreground">Ability: {data.ability.toFixed(1)}</p>
         <p className="text-muted-foreground">Motivation: {data.motivation.toFixed(1)}</p>
-        {typeof data.overlayValue === "number" && (
-          <p className="text-muted-foreground">
-            {overlayLabel}: {data.overlayValue.toFixed(1)}
-          </p>
-        )}
+        {normalizedSelection.map((key) => {
+          const rawValue = (data as Record<OverlayOption, number | null>)[key];
+          return (
+            <p key={key} className="text-muted-foreground">
+              {OVERLAY_LABELS[key]}: {rawValue != null && Number.isFinite(rawValue) ? rawValue.toFixed(1) : "n/a"}
+            </p>
+          );
+        })}
       </div>
     );
   };
@@ -144,7 +180,7 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
     <div className="space-y-6 animate-fade-in">
       <Card className="border-0 bg-card/50 shadow-xl backdrop-blur-sm">
         <CardHeader>
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex flex-1 items-start gap-3">
               <div className="rounded-xl bg-gradient-to-br from-primary to-chart-3 p-3 shadow-lg">
                 <Target className="h-6 w-6 text-white" />
@@ -156,15 +192,29 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
                 </CardDescription>
               </div>
             </div>
-            <Select value={overlayType} onValueChange={(val) => setOverlayType(val as "norms" | "system")}>
-              <SelectTrigger className="w-[200px] bg-background/50">
-                <SelectValue placeholder="Overlay" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="norms">Social Norms Overlay</SelectItem>
-                <SelectItem value="system">System Readiness Overlay</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col items-end gap-2">
+              <span className="hidden text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:block">
+                Overlays
+              </span>
+              <ToggleGroup
+                type="multiple"
+                value={overlaySelection}
+                onValueChange={handleOverlayChange}
+                className="flex flex-wrap justify-end gap-2"
+              >
+                {OVERLAY_DEFINITIONS.map(({ value, label }) => (
+                  <ToggleGroupItem
+                    key={value}
+                    value={value}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full border-primary/30 bg-background/70 px-3 py-1 text-xs font-medium data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    {label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -264,32 +314,6 @@ const FBMQuadrantChart = ({ points, isLoading = false, error }: FBMQuadrantChart
               </ScatterChart>
             </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-0 bg-card/50 shadow-xl backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-gradient-to-br from-primary to-chart-3 p-3 shadow-lg">
-              <Info className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl">How to read this chart</CardTitle>
-              <CardDescription className="mt-1 text-base">
-                Each dot represents an interview. Size reflects either social norms or system readiness scores.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>
-            Use the overlay selector to switch between norms and system readiness. Larger markers indicate higher scores for the
-            selected driver, helping you spot leverage points by quadrant.
-          </p>
-          <p>
-            The chart refreshes automatically when the connected Google Sheet receives a new row, ensuring the behavioural
-            segmentation remains live.
-          </p>
         </CardContent>
       </Card>
     </div>
