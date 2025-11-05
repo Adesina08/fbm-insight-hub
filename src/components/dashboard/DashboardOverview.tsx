@@ -861,10 +861,12 @@ const DashboardOverview = ({
                 </div>
               </CardHeader>
               <CardContent className="print:bg-white/90">
-                <div className="text-3xl font-bold print:text-[24pt] print:text-slate-900">
+                <div className="text-3xl font-semibold tracking-tight text-foreground print:text-[24pt] print:text-slate-900">
                   {card.value}
                   {card.suffix && card.value !== "n/a" ? (
-                    <span className="text-base font-medium text-muted-foreground print:text-slate-600">{card.suffix}</span>
+                    <span className="ml-1 text-base font-normal text-muted-foreground print:text-slate-600">
+                      {card.suffix}
+                    </span>
                   ) : null}
                 </div>
               </CardContent>
