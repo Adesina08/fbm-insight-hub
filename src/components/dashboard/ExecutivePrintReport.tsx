@@ -135,19 +135,19 @@ const ExecutivePrintReport = ({
       .sort((a, b) => (b.currentUseRate ?? 0) - (a.currentUseRate ?? 0))[0] ?? largestQuadrant;
 
   const summaryStatements = [
-    `The dataset covers ${formatNumber(stats.totalRespondents.value)} respondents with ${formatNumber(
+    `The current dataset covers ${formatNumber(stats.totalRespondents.value)} respondents, including ${formatNumber(
       stats.currentUsers.value,
-    )} current contraceptive users.`,
-    `Average motivation is ${formatScore(stats.averageMotivation.value)} with ability at ${formatScore(
+    )} verified current contraceptive users.`,
+    `Average motivation stands at ${formatScore(stats.averageMotivation.value)} and ability at ${formatScore(
       stats.averageAbility.value,
-    )}.`,
+    )}, both on a five-point scale.`,
     largestQuadrant
-      ? `Largest behavioural segment: ${largestQuadrant.label} representing ${formatPercentage(
+      ? `Largest behavioural segment: ${largestQuadrant.label}, representing ${formatPercentage(
           largestQuadrant.percentage,
-        )} (${formatNumber(largestQuadrant.count)} respondents).`
+        )} of respondents (${formatNumber(largestQuadrant.count)} people).`
       : null,
     momentumQuadrant
-      ? `Highest current-use rate observed in ${momentumQuadrant.label} at ${formatRate(
+      ? `Peak current-use rate observed in ${momentumQuadrant.label} at ${formatRate(
           momentumQuadrant.currentUseRate,
         )}.`
       : null,
@@ -200,7 +200,7 @@ const ExecutivePrintReport = ({
           <div className="print-section-icon">📊</div>
           <div className="flex-1">
             <h2>Executive Summary</h2>
-            <p>Headline adoption metrics and behavioural signals for leadership review.</p>
+            <p>Key adoption outcomes and behavioural intelligence for senior leaders.</p>
           </div>
           <span className="print-section-badge">Summary</span>
         </div>
@@ -241,7 +241,7 @@ const ExecutivePrintReport = ({
           <div className="print-section-icon">🧭</div>
           <div className="flex-1">
             <h2>Behavioural Segmentation</h2>
-            <p>Quadrant distribution and personas informing programme focus.</p>
+            <p>Segment distribution and personas that anchor strategic prioritisation.</p>
           </div>
           <span className="print-section-badge">Segments</span>
         </div>
@@ -251,23 +251,22 @@ const ExecutivePrintReport = ({
             <ul className="print-insight-list">
               {largestQuadrant ? (
                 <li>
-                  <strong>{largestQuadrant.label}</strong> dominates the sample with {formatPercentage(
-                    largestQuadrant.percentage,
-                  )} share. Prioritise sustaining motivation while addressing emerging friction.
+                  <strong>{largestQuadrant.label}</strong> commands {formatPercentage(largestQuadrant.percentage)} of responses.
+                  Sustain motivation levels while systematically managing emerging friction points.
                 </li>
               ) : null}
               {opportunityQuadrant ? (
                 <li>
-                  <strong>{opportunityQuadrant.label}</strong> shows the lowest ability scores ({formatScore(
+                  <strong>{opportunityQuadrant.label}</strong> registers the lowest ability score at {formatScore(
                     opportunityQuadrant.avgAbility,
-                  )}). Reduce structural barriers with facilitator prompts and service upgrades.
+                  )}. Mobilise operational partners to remove structural barriers and reinforce enabling services.
                 </li>
               ) : null}
               {momentumQuadrant ? (
                 <li>
-                  <strong>{momentumQuadrant.label}</strong> maintains the highest current-use rate at {formatRate(
+                  <strong>{momentumQuadrant.label}</strong> delivers the strongest current-use rate at {formatRate(
                     momentumQuadrant.currentUseRate,
-                  )}. Use light-touch signal prompts to protect gains.
+                  )}. Maintain momentum with light-touch signal prompts and continued recognition.
                 </li>
               ) : null}
             </ul>
@@ -279,7 +278,7 @@ const ExecutivePrintReport = ({
                 <div key={segment.id} className="print-segment-card">
                   <div className="print-segment-title">{segment.name}</div>
                   <div className="print-segment-meta">
-                    {formatPercentage(segment.percentage)} • {formatNumber(segment.count)} respondents
+                    {formatPercentage(segment.percentage)} of respondents • {formatNumber(segment.count)} people
                   </div>
                   <p>{segment.description}</p>
                   {segment.insights.length > 0 ? (
@@ -301,7 +300,7 @@ const ExecutivePrintReport = ({
           <div className="print-section-icon">💡</div>
           <div className="flex-1">
             <h2>Prompt Strategy</h2>
-            <p>Nudge performance by quadrant to inform messaging and service cues.</p>
+            <p>Effectiveness of key prompts by quadrant to guide messaging and service cues.</p>
           </div>
           <span className="print-section-badge">Prompts</span>
         </div>
@@ -311,7 +310,7 @@ const ExecutivePrintReport = ({
               <tr>
                 <th>Quadrant</th>
                 <th>Priority prompt</th>
-                <th>Avg effectiveness score</th>
+                <th>Average effectiveness score (1–5)</th>
               </tr>
             </thead>
             <tbody>
@@ -334,7 +333,7 @@ const ExecutivePrintReport = ({
           <div className="print-section-icon">🧠</div>
           <div className="flex-1">
             <h2>Behavioural Model</h2>
-            <p>Regression highlights and model diagnostics for the FBM pathway.</p>
+            <p>Regression highlights and diagnostics that evidence the FBM pathway.</p>
           </div>
           <span className="print-section-badge">Model</span>
         </div>
@@ -369,7 +368,7 @@ const ExecutivePrintReport = ({
           <div className="print-section-icon">📁</div>
           <div className="flex-1">
             <h2>Data &amp; Methodology Notes</h2>
-            <p>Context for decision-makers on the analytics source and cadence.</p>
+            <p>Concise view of data provenance, refresh cadence, and analytical guardrails.</p>
           </div>
           <span className="print-section-badge">Data</span>
         </div>
@@ -382,8 +381,8 @@ const ExecutivePrintReport = ({
         ) : null}
         <p className="print-caption">Status: {syncStatus}</p>
         <p className="print-caption">
-          Metrics are derived from the Fogg Behavior Model scoring of submitted survey responses. Prompt scores reflect average
-          agreement on facilitator, spark, and signal constructs within each quadrant.
+          Metrics derive from Fogg Behavior Model scoring applied to submitted survey responses. Prompt scores capture average
+          agreement with facilitator, spark, and signal constructs for each quadrant.
         </p>
       </section>
     </div>
