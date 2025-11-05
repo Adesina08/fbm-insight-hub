@@ -523,6 +523,18 @@ const Index = () => {
                 isLoading={isAnalyticsLoading}
                 error={analyticsError}
               />
+              <div className="rounded-2xl border bg-background/60 p-5 text-sm leading-relaxed text-muted-foreground">
+                <p>
+                  The diagram traces how prompts on the left activate psychosocial drivers in the centre, which in turn feed
+                  into the contraceptive use outcome on the right. Each node summarises the average score and supporting
+                  evidence for that construct so you can spot which drivers are comparatively stronger or weaker.
+                </p>
+                <p className="mt-3">
+                  Connectors are colour-coded to convey direction: green arcs indicate positive coefficients that reinforce
+                  progress, while red arcs denote negative relationships that suppress momentum. Thicker lines signal
+                  stronger effect sizes, helping you quickly see which pathways merit amplification or mitigation.
+                </p>
+              </div>
             </section>
           </TabsContent>
           </Tabs>
