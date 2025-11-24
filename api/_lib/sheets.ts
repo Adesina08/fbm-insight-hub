@@ -23,11 +23,13 @@ export interface SpreadsheetMetadata {
   spreadsheetUrl: string | null;
   title: string;
   timeZone: string | null;
+  primarySheetTitle: string;
 }
 
 let cachedServiceAccount: ServiceAccountConfig | null = null;
 let cachedToken: CachedToken | null = null;
 let cachedSpreadsheetConfig: SpreadsheetConfig | null = null;
+let cachedPrimarySheetTitle: string | null = null;
 
 function base64UrlEncode(value: string | Buffer): string {
   const buffer = typeof value === "string" ? Buffer.from(value) : value;
@@ -263,9 +265,10 @@ async function googleRequest<T>(url: string, init?: RequestInit): Promise<T> {
   return parsed;
 }
 
-export async function fetchSheetValues(range: string): Promise<unknown[][]> {
+export async function fetchSheetValues(range?: string): Promise<unknown[][]> {
   const { spreadsheetId } = getSpreadsheetConfig();
-  const encodedRange = encodeURIComponent(range);
+  const effectiveRange = range || (await getPrimarySheetTitle());
+  const encodedRange = encodeURIComponent(effectiveRange);
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}` +
     "?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING";
@@ -278,12 +281,20 @@ export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
   const { spreadsheetId } = getSpreadsheetConfig();
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    "?fields=spreadsheetId,spreadsheetUrl,properties(title,timeZone)";
+    "?fields=spreadsheetId,spreadsheetUrl,properties(title,timeZone)," +
+    "sheets(properties(title,index,gridProperties(rowCount,columnCount)))";
 
   const payload = await googleRequest<{
     spreadsheetId?: string;
     spreadsheetUrl?: string;
     properties?: { title?: string; timeZone?: string };
+    sheets?: Array<{
+      properties?: {
+        title?: string;
+        index?: number;
+        gridProperties?: { rowCount?: number; columnCount?: number };
+      };
+    }>;
   }>(url);
 
   const id = typeof payload.spreadsheetId === "string" ? payload.spreadsheetId : spreadsheetId;
@@ -300,12 +311,41 @@ export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
       ? payload.properties.timeZone.trim()
       : null;
 
+  const sheets = Array.isArray(payload.sheets) ? payload.sheets : [];
+  const primarySheet = sheets
+    .map((sheet) => {
+      const title = typeof sheet.properties?.title === "string" ? sheet.properties.title : null;
+      const index = typeof sheet.properties?.index === "number" ? sheet.properties.index : Number.POSITIVE_INFINITY;
+      return { title, index };
+    })
+    .filter((sheet) => sheet.title)
+    .sort((a, b) => a.index - b.index)[0];
+
+  const primarySheetTitle = primarySheet?.title ?? null;
+
+  if (!primarySheetTitle) {
+    throw new Error("No sheets were found in the configured spreadsheet.");
+  }
+
+  cachedPrimarySheetTitle = primarySheetTitle;
+
   return {
     spreadsheetId: id,
     spreadsheetUrl,
     title,
     timeZone,
+    primarySheetTitle,
   };
+}
+
+export async function getPrimarySheetTitle(): Promise<string> {
+  if (cachedPrimarySheetTitle) {
+    return cachedPrimarySheetTitle;
+  }
+
+  const metadata = await fetchSpreadsheetMetadata();
+  cachedPrimarySheetTitle = metadata.primarySheetTitle;
+  return cachedPrimarySheetTitle;
 }
 
 export interface SheetRecord extends Record<string, unknown> {}

@@ -19,14 +19,6 @@ interface SheetInfoResponse {
   lastUpdated: string | null;
 }
 
-function getDataRange(): string {
-  const range = process.env.GOOGLE_SHEETS_DATA_RANGE;
-  if (!range || range.trim().length === 0) {
-    throw new Error("Missing required environment variable GOOGLE_SHEETS_DATA_RANGE.");
-  }
-  return range.trim();
-}
-
 function parseTimestamp(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
@@ -113,19 +105,9 @@ async function handleFetchRequest(req: Request): Promise<Response> {
     return sendError(405, "Method Not Allowed");
   }
 
-  let range: string;
   try {
-    range = getDataRange();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
-    return sendError(500, message);
-  }
-
-  try {
-    const [metadata, values] = await Promise.all([
-      fetchSpreadsheetMetadata(),
-      fetchSheetValues(range),
-    ]);
+    const metadata = await fetchSpreadsheetMetadata();
+    const values = await fetchSheetValues(metadata.primarySheetTitle);
 
     const headers = extractHeaders(values);
     const records = convertSheetValuesToRecords(values);
@@ -158,20 +140,9 @@ async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Pro
     return;
   }
 
-  let range: string;
   try {
-    range = getDataRange();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
-    sendError(res, 500, message);
-    return;
-  }
-
-  try {
-    const [metadata, values] = await Promise.all([
-      fetchSpreadsheetMetadata(),
-      fetchSheetValues(range),
-    ]);
+    const metadata = await fetchSpreadsheetMetadata();
+    const values = await fetchSheetValues(metadata.primarySheetTitle);
 
     const headers = extractHeaders(values);
     const records = convertSheetValuesToRecords(values);
