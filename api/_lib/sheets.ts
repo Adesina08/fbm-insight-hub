@@ -23,11 +23,13 @@ export interface SpreadsheetMetadata {
   spreadsheetUrl: string | null;
   title: string;
   timeZone: string | null;
+  primarySheetTitle: string;
 }
 
 let cachedServiceAccount: ServiceAccountConfig | null = null;
 let cachedToken: CachedToken | null = null;
 let cachedSpreadsheetConfig: SpreadsheetConfig | null = null;
+let cachedPrimarySheetTitle: string | null = null;
 
 function base64UrlEncode(value: string | Buffer): string {
   const buffer = typeof value === "string" ? Buffer.from(value) : value;
@@ -263,9 +265,10 @@ async function googleRequest<T>(url: string, init?: RequestInit): Promise<T> {
   return parsed;
 }
 
-export async function fetchSheetValues(range: string): Promise<unknown[][]> {
+export async function fetchSheetValues(range?: string): Promise<unknown[][]> {
   const { spreadsheetId } = getSpreadsheetConfig();
-  const encodedRange = encodeURIComponent(range);
+  const effectiveRange = range || (await getPrimarySheetTitle());
+  const encodedRange = encodeURIComponent(effectiveRange);
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}` +
     "?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING";
@@ -278,12 +281,20 @@ export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
   const { spreadsheetId } = getSpreadsheetConfig();
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    "?fields=spreadsheetId,spreadsheetUrl,properties(title,timeZone)";
+    "?fields=spreadsheetId,spreadsheetUrl,properties(title,timeZone)," +
+    "sheets(properties(title,index,gridProperties(rowCount,columnCount)))";
 
   const payload = await googleRequest<{
     spreadsheetId?: string;
     spreadsheetUrl?: string;
     properties?: { title?: string; timeZone?: string };
+    sheets?: Array<{
+      properties?: {
+        title?: string;
+        index?: number;
+        gridProperties?: { rowCount?: number; columnCount?: number };
+      };
+    }>;
   }>(url);
 
   const id = typeof payload.spreadsheetId === "string" ? payload.spreadsheetId : spreadsheetId;
@@ -300,17 +311,69 @@ export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
       ? payload.properties.timeZone.trim()
       : null;
 
+  const sheets = Array.isArray(payload.sheets) ? payload.sheets : [];
+  const primarySheet = sheets
+    .map((sheet) => {
+      const title = typeof sheet.properties?.title === "string" ? sheet.properties.title : null;
+      const index = typeof sheet.properties?.index === "number" ? sheet.properties.index : Number.POSITIVE_INFINITY;
+      return { title, index };
+    })
+    .filter((sheet) => sheet.title)
+    .sort((a, b) => a.index - b.index)[0];
+
+  const primarySheetTitle = primarySheet?.title ?? null;
+
+  if (!primarySheetTitle) {
+    throw new Error("No sheets were found in the configured spreadsheet.");
+  }
+
+  cachedPrimarySheetTitle = primarySheetTitle;
+
   return {
     spreadsheetId: id,
     spreadsheetUrl,
     title,
     timeZone,
+    primarySheetTitle,
   };
 }
 
-export interface SheetRecord extends Record<string, unknown> {}
+export async function getPrimarySheetTitle(): Promise<string> {
+  if (cachedPrimarySheetTitle) {
+    return cachedPrimarySheetTitle;
+  }
 
-export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] {
+  const metadata = await fetchSpreadsheetMetadata();
+  cachedPrimarySheetTitle = metadata.primarySheetTitle;
+  return cachedPrimarySheetTitle;
+}
+
+export type SheetRecord = Record<string, unknown>;
+
+type HeaderInfo = {
+  label: string;
+  normalized: string;
+  baseNormalized: string;
+};
+
+function normalizeKey(value: string, fallback: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_{2,}/g, "_");
+
+  return normalized.length > 0 ? normalized : fallback;
+}
+
+function dedupeValue(value: string, seen: Map<string, number>): string {
+  const count = seen.get(value) ?? 0;
+  seen.set(value, count + 1);
+  return count === 0 ? value : `${value} (${count + 1})`;
+}
+
+function buildHeaderInfo(values: unknown[][]): HeaderInfo[] {
   if (!Array.isArray(values) || values.length === 0) {
     return [];
   }
@@ -320,12 +383,30 @@ export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] 
     return [];
   }
 
-  const headers = headerRow.map((cell, index) => {
-    if (typeof cell === "string" && cell.trim().length > 0) {
-      return cell.trim();
-    }
-    return `column_${index + 1}`;
+  const displayCounts = new Map<string, number>();
+  const normalizedCounts = new Map<string, number>();
+
+  return headerRow.map((cell, index) => {
+    const baseLabel =
+      typeof cell === "string" && cell.trim().length > 0 ? cell.trim() : `Column ${index + 1}`;
+    const label = dedupeValue(baseLabel, displayCounts);
+
+    const baseNormalized = normalizeKey(baseLabel, `column_${index + 1}`);
+    const normalized = dedupeValue(baseNormalized, normalizedCounts);
+
+    return { label, normalized, baseNormalized };
   });
+}
+
+export function extractHeaders(values: unknown[][]): string[] {
+  return buildHeaderInfo(values).map((header) => header.label);
+}
+
+export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] {
+  const headers = buildHeaderInfo(values);
+  if (headers.length === 0) {
+    return [];
+  }
 
   const specialMap: Record<string, string> = {
     submission_time: "_submission_time",
@@ -348,23 +429,15 @@ export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] 
         return;
       }
 
-      record[header] = rawValue;
+      record[header.label] = rawValue;
 
-      if (typeof header === "string") {
-        const normalized = header
-          .trim()
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "_")
-          .replace(/^_+|_+$/g, "");
+      if (header.normalized && header.normalized !== header.label) {
+        record[header.normalized] = rawValue;
+      }
 
-        if (normalized && normalized !== header) {
-          record[normalized] = rawValue;
-        }
-
-        const mapped = specialMap[normalized];
-        if (mapped) {
-          record[mapped] = rawValue;
-        }
+      const mapped = specialMap[header.baseNormalized];
+      if (mapped) {
+        record[mapped] = rawValue;
       }
     });
 

@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "http";
 
 import { handleOptionsRequest, jsonResponse, sendError, setCorsHeaders } from "./_lib/http";
-import { convertSheetValuesToRecords, fetchSheetValues } from "./_lib/sheets";
+import { convertSheetValuesToRecords, fetchSheetValues, getPrimarySheetTitle } from "./_lib/sheets";
 
 interface SheetsDataResponse {
   count: number;
@@ -28,14 +28,6 @@ function logSheetsFetchError(range: string, error: unknown): void {
   console.error(JSON.stringify(errorPayload));
 }
 
-function getDataRange(): string {
-  const range = process.env.GOOGLE_SHEETS_DATA_RANGE;
-  if (!range || range.trim().length === 0) {
-    throw new Error("Missing required environment variable GOOGLE_SHEETS_DATA_RANGE.");
-  }
-  return range.trim();
-}
-
 function sendJson(res: ServerResponse, payload: SheetsDataResponse): void {
   setCorsHeaders(res);
   res.statusCode = 200;
@@ -57,16 +49,10 @@ async function handleFetchRequest(req: Request): Promise<Response> {
     return sendError(405, "Method Not Allowed");
   }
 
-  let range: string;
+  let primaryRange: string | undefined;
   try {
-    range = getDataRange();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
-    return sendError(500, message);
-  }
-
-  try {
-    const values = await fetchSheetValues(range);
+    primaryRange = await getPrimarySheetTitle();
+    const values = await fetchSheetValues(primaryRange);
     const results = convertSheetValuesToRecords(values);
     return jsonResponse({
       count: results.length,
@@ -75,7 +61,7 @@ async function handleFetchRequest(req: Request): Promise<Response> {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to load Google Sheet data. Please try again later.";
-    logSheetsFetchError(range, error);
+    logSheetsFetchError(primaryRange ?? "<auto>", error);
     return sendError(502, message);
   }
 }
@@ -90,17 +76,10 @@ async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Pro
     return;
   }
 
-  let range: string;
+  let primaryRange: string | undefined;
   try {
-    range = getDataRange();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
-    sendError(res, 500, message);
-    return;
-  }
-
-  try {
-    const values = await fetchSheetValues(range);
+    primaryRange = await getPrimarySheetTitle();
+    const values = await fetchSheetValues(primaryRange);
     const results = convertSheetValuesToRecords(values);
     sendJson(res, {
       count: results.length,
@@ -109,7 +88,7 @@ async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Pro
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to load Google Sheet data. Please try again later.";
-    logSheetsFetchError(range, error);
+    logSheetsFetchError(primaryRange ?? "<auto>", error);
     sendError(res, 502, message);
   }
 }

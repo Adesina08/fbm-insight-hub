@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { handleOptionsRequest, jsonResponse, sendError, setCorsHeaders } from "./_lib/http";
 import {
   convertSheetValuesToRecords,
+  extractHeaders,
   fetchSheetValues,
   fetchSpreadsheetMetadata,
   type SheetRecord,
@@ -17,14 +18,6 @@ interface SheetInfoResponse {
   totalColumns: number;
   headers: string[];
   lastUpdated: string | null;
-}
-
-function getDataRange(): string {
-  const range = process.env.GOOGLE_SHEETS_DATA_RANGE;
-  if (!range || range.trim().length === 0) {
-    throw new Error("Missing required environment variable GOOGLE_SHEETS_DATA_RANGE.");
-  }
-  return range.trim();
 }
 
 function parseTimestamp(value: unknown): string | null {
@@ -77,21 +70,6 @@ function computeLastUpdated(records: SheetRecord[]): string | null {
   return latest;
 }
 
-function extractHeaders(values: unknown[][]): string[] {
-  if (!Array.isArray(values) || values.length === 0) {
-    return [];
-  }
-
-  const headerRow = values[0];
-  if (!Array.isArray(headerRow)) {
-    return [];
-  }
-
-  return headerRow
-    .map((cell) => (typeof cell === "string" ? cell.trim() : ""))
-    .map((value, index) => (value.length > 0 ? value : `Column ${index + 1}`));
-}
-
 function sendJson(res: ServerResponse, payload: SheetInfoResponse): void {
   setCorsHeaders(res);
   res.statusCode = 200;
@@ -113,19 +91,9 @@ async function handleFetchRequest(req: Request): Promise<Response> {
     return sendError(405, "Method Not Allowed");
   }
 
-  let range: string;
   try {
-    range = getDataRange();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
-    return sendError(500, message);
-  }
-
-  try {
-    const [metadata, values] = await Promise.all([
-      fetchSpreadsheetMetadata(),
-      fetchSheetValues(range),
-    ]);
+    const metadata = await fetchSpreadsheetMetadata();
+    const values = await fetchSheetValues(metadata.primarySheetTitle);
 
     const headers = extractHeaders(values);
     const records = convertSheetValuesToRecords(values);
@@ -158,20 +126,9 @@ async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Pro
     return;
   }
 
-  let range: string;
   try {
-    range = getDataRange();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Missing Google Sheets configuration.";
-    sendError(res, 500, message);
-    return;
-  }
-
-  try {
-    const [metadata, values] = await Promise.all([
-      fetchSpreadsheetMetadata(),
-      fetchSheetValues(range),
-    ]);
+    const metadata = await fetchSpreadsheetMetadata();
+    const values = await fetchSheetValues(metadata.primarySheetTitle);
 
     const headers = extractHeaders(values);
     const records = convertSheetValuesToRecords(values);

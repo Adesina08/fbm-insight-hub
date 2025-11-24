@@ -69,15 +69,13 @@ Need to spin up new dashboard ideas quickly? Use the master prompt in [`docs/fbm
 The dashboard now reads live data from a Google Sheet. Each row is treated like a survey submission, so the analytics continue to work without code changes. To enable the integration:
 
 1. Copy `.env.example` to `.env` and populate the following **server-side** variables (no `VITE_` prefix):
-   - `GOOGLE_SERVICE_ACCOUNT` – the entire JSON credentials document for a service account with access to the sheet.
-   - `GOOGLE_SHEETS_ID` – the spreadsheet ID (the segment between `/d/` and `/edit` in the sheet URL).
-   - `GOOGLE_SHEETS_DATA_RANGE` – the A1 range that covers the header row and all submission rows (for example, `Form Responses!A:Z`).
+   - `GOOGLE_SERVICE_ACCOUNT` – the entire JSON credentials document for a service account with access to the sheet (base64 or raw JSON both work). Alternatively, provide `GOOGLE_CLIENT_EMAIL` and `GOOGLE_PRIVATE_KEY`.
+   - `GOOGLE_SHEETS_ID` – the spreadsheet ID (the segment between `/d/` and `/edit` in the sheet URL). The app automatically reads from the first sheet in the workbook, so no range configuration is required.
    - (Optional) override the frontend field mappings (`VITE_SHEETS_FIELD_*`) if the column names in the sheet differ from the default question names used in the analytics module.
-   - `GOOGLE_SHEETS_API_KEY` (or `GOOGLE_API_KEY`) – required for public Sheets API access when running without the service account token flow.
 2. Share the sheet with the service account email so it can read values.
 3. Redeploy or restart `npm run dev` so the environment variables are picked up. The `/api/sheets-data` endpoint now streams rows from Google Sheets, and `/api/sheets-metadata` exposes sheet metadata for the UI card.
 
-Netlify builds run `npm run verify-env` before the Vite build, so deployments will fail fast if `GOOGLE_SHEETS_API_KEY`/`GOOGLE_API_KEY`, `GOOGLE_SHEETS_ID`, or `GOOGLE_SHEETS_DATA_RANGE` are missing.
+Netlify builds run `npm run verify-env` before the Vite build, so deployments will fail fast if `GOOGLE_SHEETS_ID` or service account credentials are missing.
 
 If the sheet cannot be reached, the UI surfaces descriptive error messages with retry actions.
 

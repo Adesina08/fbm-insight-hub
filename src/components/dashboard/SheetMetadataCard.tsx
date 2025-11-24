@@ -80,8 +80,8 @@ const SheetMetadataCard = () => {
           <Alert>
             <AlertTitle>No spreadsheet detected</AlertTitle>
             <AlertDescription>
-              Configure GOOGLE_SHEETS_ID, GOOGLE_SHEETS_DATA_RANGE, and GOOGLE_SERVICE_ACCOUNT on the backend to enable the
-              analytics spreadsheet integration.
+              Configure GOOGLE_SHEETS_ID and GOOGLE_SERVICE_ACCOUNT credentials on the backend to enable the analytics
+              spreadsheet integration.
             </AlertDescription>
           </Alert>
         ) : (
