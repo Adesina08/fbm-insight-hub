@@ -43,24 +43,59 @@ function getServiceAccount(): ServiceAccountConfig {
     return cachedServiceAccount;
   }
 
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
-  if (!raw) {
-    throw new Error("Missing required environment variable GOOGLE_SERVICE_ACCOUNT.");
-  }
+  const coalescedJson = (() => {
+    const rawPrimary = process.env.GOOGLE_SERVICE_ACCOUNT;
+    if (rawPrimary && rawPrimary.trim().length > 0) {
+      return rawPrimary.trim();
+    }
 
-  const normalizedRaw = raw.trim();
+    const rawBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64 ?? process.env.GOOGLE_SERVICE_ACCOUNT_B64;
+    if (rawBase64 && rawBase64.trim().length > 0) {
+      try {
+        return Buffer.from(rawBase64.trim(), "base64").toString("utf8");
+      } catch {
+        // Fall through and let the downstream validation throw a clearer error.
+      }
+    }
+
+    const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+    const privateKeyEnv = process.env.GOOGLE_PRIVATE_KEY;
+    if (clientEmail && privateKeyEnv) {
+      return JSON.stringify({ client_email: clientEmail, private_key: privateKeyEnv });
+    }
+
+    throw new Error(
+      "Missing Google credentials. Provide GOOGLE_SERVICE_ACCOUNT JSON, GOOGLE_SERVICE_ACCOUNT_BASE64, or GOOGLE_CLIENT_EMAIL + GOOGLE_PRIVATE_KEY.",
+    );
+  })();
+
+  const normalizedRaw = coalescedJson;
   const jsonString =
     (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")) ||
     (normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'"))
       ? normalizedRaw.slice(1, -1)
       : normalizedRaw;
 
+  const decodeIfBase64Json = (value: string): string => {
+    try {
+      const decoded = Buffer.from(value, "base64").toString("utf8");
+      if (decoded.trim().startsWith("{") && decoded.trim().endsWith("}")) {
+        return decoded;
+      }
+    } catch {
+      // Not base64 JSON; continue with the raw string.
+    }
+    return value;
+  };
+
+  const hydratedJsonString = decodeIfBase64Json(jsonString);
+
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(jsonString);
+    parsed = JSON.parse(hydratedJsonString);
   } catch (error) {
     throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT must contain valid JSON credentials. Remove any surrounding quotes when pasting the JSON.",
+      "GOOGLE_SERVICE_ACCOUNT must contain valid JSON credentials. Remove surrounding quotes or ensure the base64 string decodes to JSON.",
     );
   }
 
@@ -77,9 +112,37 @@ function getServiceAccount(): ServiceAccountConfig {
     );
   }
 
-  const privateKey = privateKeyRaw.includes("BEGIN PRIVATE KEY")
-    ? privateKeyRaw.replace(/\\n/g, "\n")
-    : privateKeyRaw;
+  const normalizePrivateKey = (raw: string): string => {
+    const withNewlines = raw
+      .replace(/\\r\\n/g, "\n")
+      .replace(/\\n/g, "\n")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
+
+    if (withNewlines.includes("BEGIN PRIVATE KEY")) {
+      return withNewlines;
+    }
+
+    // Some environments store the key as base64 without headers; attempt to decode and wrap.
+    try {
+      const decoded = Buffer.from(withNewlines, "base64").toString("utf8");
+      if (decoded.includes("BEGIN PRIVATE KEY")) {
+        return decoded;
+      }
+      if (/^[A-Za-z0-9+/=]+$/.test(withNewlines)) {
+        const wrappedBody = decoded.replace(/\s+/g, "").match(/.{1,64}/g)?.join("\n") ?? decoded;
+        return `-----BEGIN PRIVATE KEY-----\n${wrappedBody}\n-----END PRIVATE KEY-----`;
+      }
+    } catch {
+      // Fall through to the final wrapping logic below.
+    }
+
+    const sanitizedBody = withNewlines.replace(/\s+/g, "");
+    const wrapped = sanitizedBody.match(/.{1,64}/g)?.join("\n") ?? sanitizedBody;
+    return `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----`;
+  };
+
+  const privateKey = normalizePrivateKey(privateKeyRaw);
 
   cachedServiceAccount = {
     clientEmail,

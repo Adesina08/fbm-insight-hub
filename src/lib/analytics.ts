@@ -14,9 +14,15 @@ export const DEFAULT_FIELD_MAP = {
   promptFacilitator: "prompt_facilitator",
   promptSpark: "prompt_spark",
   promptSignal: "prompt_signal",
+  state: "A1",
+  lga: "A2",
+  gender: "A4",
   age: "A5",
   maritalStatus: "A6",
   educationLevel: "A7",
+  religion: "A8",
+  employmentStatus: "A9",
+  occupation: "A10",
   location: "A3",
   parity: "parity",
 } as const;
@@ -498,9 +504,15 @@ export type MotivationSubdomainId = "C1" | "C2" | "C3" | "C4";
 export type AbilitySubdomainId = "D1" | "D2" | "D3" | "D4" | "D5" | "D6";
 
 export interface RespondentProfile {
+  state: string | null;
+  lga: string | null;
+  gender: string | null;
   age: number | null;
   maritalStatus: string | null;
   educationLevel: string | null;
+  religion: string | null;
+  employmentStatus: string | null;
+  occupation: string | null;
   location: string | null;
   parity: number | null;
 }
@@ -624,9 +636,15 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
   }
 
   const profile: RespondentProfile = {
+    state: parseString(getValueForQuestion(record, "A1")),
+    lga: parseString(getValueForQuestion(record, "A2")),
+    gender: parseString(getValueForQuestion(record, "A4")),
     age: parseNumber(getValueForQuestion(record, "A5")),
     maritalStatus: parseString(getValueForQuestion(record, "A6")),
     educationLevel: parseString(getValueForQuestion(record, "A7")),
+    religion: parseString(getValueForQuestion(record, "A8")),
+    employmentStatus: parseString(getValueForQuestion(record, "A9")),
+    occupation: parseString(getValueForQuestion(record, "A10")),
     location: parseString(getValueForQuestion(record, "A3")),
     parity: parseNumber(
       getValueForTokens(record, ["parity"])
@@ -722,6 +740,17 @@ const FIELD_TOKEN_HINTS: Record<FieldKey, string[][]> = {
     ["signal", "prompt"],
     ["signal"],
   ],
+  state: [
+    ["state"],
+  ],
+  lga: [
+    ["lga"],
+    ["local", "government"],
+  ],
+  gender: [
+    ["gender"],
+    ["sex"],
+  ],
   age: [
     ["age"],
     ["respondent", "age"],
@@ -735,6 +764,20 @@ const FIELD_TOKEN_HINTS: Record<FieldKey, string[][]> = {
     ["education"],
     ["education", "level"],
     ["school", "level"],
+  ],
+  religion: [
+    ["religion"],
+    ["faith"],
+  ],
+  employmentStatus: [
+    ["employment"],
+    ["employment", "status"],
+    ["job", "status"],
+    ["work", "status"],
+  ],
+  occupation: [
+    ["occupation"],
+    ["job"],
   ],
   location: [
     ["location"],
@@ -814,11 +857,17 @@ export interface DescriptiveCategoryValue {
 }
 
 export interface DescriptiveSubmission {
+  state: DescriptiveCategoryValue | null;
+  lga: DescriptiveCategoryValue | null;
+  gender: DescriptiveCategoryValue | null;
   id: string;
   age: number | null;
   ageBucket: string | null;
   maritalStatus: DescriptiveCategoryValue | null;
   educationLevel: DescriptiveCategoryValue | null;
+  religion: DescriptiveCategoryValue | null;
+  employmentStatus: DescriptiveCategoryValue | null;
+  occupation: DescriptiveCategoryValue | null;
   location: DescriptiveCategoryValue | null;
   parity: number | null;
   parityBucket: string | null;
@@ -843,8 +892,14 @@ export interface DescriptiveFilterOption {
 
 export interface DescriptiveAnalyticsFilters {
   age: DescriptiveFilterOption[];
+  state: DescriptiveFilterOption[];
+  lga: DescriptiveFilterOption[];
+  gender: DescriptiveFilterOption[];
   maritalStatus: DescriptiveFilterOption[];
   educationLevel: DescriptiveFilterOption[];
+  religion: DescriptiveFilterOption[];
+  employmentStatus: DescriptiveFilterOption[];
+  occupation: DescriptiveFilterOption[];
   location: DescriptiveFilterOption[];
   parity: DescriptiveFilterOption[];
 }
@@ -1046,19 +1101,28 @@ export function normalizeSubmissions(
     const promptSparkExposure = derived.promptSparkExposure;
     const promptSignalExposure = derived.promptSignalExposure;
 
-    const age =
-      parseNumber(lookupFieldValue(normalizedRecord, "age", fieldMap)) ?? derived.profile?.age ?? null;
-    const maritalStatus =
-      parseString(lookupFieldValue(normalizedRecord, "maritalStatus", fieldMap))
-        ?? derived.profile?.maritalStatus ?? null;
-    const educationLevel =
-      parseString(lookupFieldValue(normalizedRecord, "educationLevel", fieldMap))
-        ?? derived.profile?.educationLevel ?? null;
-    const location =
-      parseString(lookupFieldValue(normalizedRecord, "location", fieldMap))
-        ?? derived.profile?.location ?? null;
-    const parity =
-      parseNumber(lookupFieldValue(normalizedRecord, "parity", fieldMap)) ?? derived.profile?.parity ?? null;
+    const state = parseString(lookupFieldValue(normalizedRecord, "state", fieldMap))
+      ?? derived.profile?.state ?? null;
+    const lga = parseString(lookupFieldValue(normalizedRecord, "lga", fieldMap))
+      ?? derived.profile?.lga ?? null;
+    const gender = parseString(lookupFieldValue(normalizedRecord, "gender", fieldMap))
+      ?? derived.profile?.gender ?? null;
+    const age = parseNumber(lookupFieldValue(normalizedRecord, "age", fieldMap))
+      ?? derived.profile?.age ?? null;
+    const maritalStatus = parseString(lookupFieldValue(normalizedRecord, "maritalStatus", fieldMap))
+      ?? derived.profile?.maritalStatus ?? null;
+    const educationLevel = parseString(lookupFieldValue(normalizedRecord, "educationLevel", fieldMap))
+      ?? derived.profile?.educationLevel ?? null;
+    const religion = parseString(lookupFieldValue(normalizedRecord, "religion", fieldMap))
+      ?? derived.profile?.religion ?? null;
+    const employmentStatus = parseString(lookupFieldValue(normalizedRecord, "employmentStatus", fieldMap))
+      ?? derived.profile?.employmentStatus ?? null;
+    const occupation = parseString(lookupFieldValue(normalizedRecord, "occupation", fieldMap))
+      ?? derived.profile?.occupation ?? null;
+    const location = parseString(lookupFieldValue(normalizedRecord, "location", fieldMap))
+      ?? derived.profile?.location ?? null;
+    const parity = parseNumber(lookupFieldValue(normalizedRecord, "parity", fieldMap))
+      ?? derived.profile?.parity ?? null;
 
     const motivationItems: Partial<Record<MotivationSubdomainId, number | null>> = {
       C1: derived.motivationItems?.C1 ?? null,
@@ -1106,9 +1170,15 @@ export function normalizeSubmissions(
       promptSignalExposure,
       submissionTime,
       profile: {
+        state,
+        lga,
+        gender,
         age,
         maritalStatus,
         educationLevel,
+        religion,
+        employmentStatus,
+        occupation,
         location,
         parity,
       },
@@ -1294,18 +1364,30 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
   } satisfies DashboardAnalytics["stats"];
 
   const descriptiveSubmissions: DescriptiveSubmission[] = submissions.map((submission) => {
+    const state = normalizeCategoryValue(submission.profile.state);
+    const lga = normalizeCategoryValue(submission.profile.lga);
+    const gender = normalizeCategoryValue(submission.profile.gender);
     const maritalStatus = normalizeCategoryValue(submission.profile.maritalStatus);
     const educationLevel = normalizeCategoryValue(submission.profile.educationLevel);
+    const religion = normalizeCategoryValue(submission.profile.religion);
+    const employmentStatus = normalizeCategoryValue(submission.profile.employmentStatus);
+    const occupation = normalizeCategoryValue(submission.profile.occupation);
     const location = normalizeCategoryValue(submission.profile.location);
     const ageBucket = determineBucketValue(submission.profile.age, AGE_BUCKET_DEFINITIONS);
     const parityBucket = determineBucketValue(submission.profile.parity, PARITY_BUCKET_DEFINITIONS);
 
     return {
       id: submission.id,
+      state,
+      lga,
+      gender,
       age: submission.profile.age,
       ageBucket,
       maritalStatus,
       educationLevel,
+      religion,
+      employmentStatus,
+      occupation,
       location,
       parity: submission.profile.parity,
       parityBucket,
@@ -1326,9 +1408,17 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
   const descriptive: DescriptiveAnalytics = {
     submissions: descriptiveSubmissions,
     filters: {
+      state: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.state)),
+      lga: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.lga)),
+      gender: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.gender)),
       age: buildAgeFilterOptions(descriptiveSubmissions),
       maritalStatus: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.maritalStatus)),
       educationLevel: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.educationLevel)),
+      religion: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.religion)),
+      employmentStatus: buildCategoricalFilterOptions(
+        descriptiveSubmissions.map((item) => item.employmentStatus),
+      ),
+      occupation: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.occupation)),
       location: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.location)),
       parity: buildParityFilterOptions(descriptiveSubmissions),
     },
