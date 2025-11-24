@@ -10,7 +10,7 @@ import {
   GraduationCap,
   Layers,
   LineChart,
-  Map,
+  Map as MapIcon,
   Sparkles,
 } from "lucide-react";
 import DashboardOverview, { type DashboardOverviewMetadata } from "@/components/dashboard/DashboardOverview";
@@ -586,7 +586,7 @@ const Index = () => {
                 <span className="hidden sm:inline font-medium">Behavioral Variation</span>
               </TabsTrigger>
               <TabsTrigger value="ecosystem" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
-                <Map className="w-4 h-4" />
+                <MapIcon className="w-4 h-4" />
                 <span className="hidden sm:inline font-medium">Ecosystem Map</span>
               </TabsTrigger>
               <TabsTrigger value="segmentation" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-chart-3 data-[state=active]:text-white data-[state=active]:shadow-md py-3">
@@ -834,7 +834,7 @@ const Index = () => {
               <section className="space-y-6 print:space-y-8 print-section">
                 <div className="flex items-start gap-4">
                   <div className="rounded-full bg-chart-5/10 p-2 text-chart-5 shadow-sm">
-                    <Map className="h-5 w-5" />
+                    <MapIcon className="h-5 w-5" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Behavioral Ecosystem Map (FBM + System Factors)</h2>
