@@ -514,58 +514,50 @@ interface DerivedMetrics {
   promptFacilitator?: number | null;
   promptSpark?: number | null;
   promptSignal?: number | null;
+  promptFacilitatorExposure?: boolean;
+  promptSparkExposure?: boolean;
+  promptSignalExposure?: boolean;
   currentUse?: boolean | null;
   motivationItems?: Partial<Record<MotivationSubdomainId, number | null>>;
   abilityItems?: Partial<Record<AbilitySubdomainId, number | null>>;
   profile?: RespondentProfile;
 }
 
-function computePromptExposure(
+function hasPromptExposure(
   record: NormalizedRecord,
   groups: string[][],
   options?: { noPromptTokens?: string[] },
-): number | null {
+): boolean {
   if (options?.noPromptTokens) {
     const noPrompt = parseBoolean(getValueForTokens(record, options.noPromptTokens));
     if (noPrompt === true) {
-      return 1;
+      return false;
     }
   }
 
-  const exposures = groups.map((tokens) => {
+  return groups.some((tokens) => {
     const raw = getValueForTokens(record, tokens);
     const parsed = parseBoolean(raw);
     if (parsed != null) {
-      return parsed ? 1 : 0;
+      return parsed === true;
     }
-    if (typeof raw === "string") {
-      const normalized = normalizeTextValue(raw);
-      if (!normalized) {
-        return null;
-      }
-      if (normalized.includes("yes")) {
-        return 1;
-      }
-      if (normalized.includes("no")) {
-        return 0;
-      }
+
+    const likert = parseLikertScore(raw);
+    if (likert != null) {
+      return likert >= 4;
     }
-    if (typeof raw === "number") {
-      if (!Number.isFinite(raw)) {
-        return null;
-      }
-      return raw > 0 ? 1 : 0;
+
+    const numeric = parseNumber(raw);
+    if (numeric != null) {
+      return numeric > 0;
     }
-    return null;
+
+    const text = parseString(raw)?.toLowerCase();
+    if (!text) return false;
+    if (["yes", "true", "y", "1"].includes(text)) return true;
+    if (["no", "false", "n", "0"].includes(text)) return false;
+    return false;
   });
-
-  const valid = exposures.filter((value): value is number => value != null);
-  if (valid.length === 0) {
-    return null;
-  }
-
-  const ratio = valid.reduce((acc, value) => acc + value, 0) / valid.length;
-  return ratio * 4 + 1;
 }
 
 function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
@@ -585,7 +577,7 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     D6: parseLikertScore(getValueForQuestion(record, "D6")),
   };
 
-  const motivation = averageNumbers(Object.values(motivationItems));
+  const motivation = averageNumbers([motivationItems.C2, motivationItems.C3, motivationItems.C4]);
 
   const ability = averageNumbers(Object.values(abilityItems));
 
@@ -602,7 +594,7 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
   const noPromptTokens = getQuestionOptionTokens("E1", "No prompts received");
   const noPromptOptionTokens = noPromptTokens.length > 0 ? [...noPromptTokens] : undefined;
 
-  const facilitatorExposure = computePromptExposure(
+  const facilitatorExposure = hasPromptExposure(
     record,
     [
       getQuestionOptionTokens("E1", "Yes, from a health worker"),
@@ -611,13 +603,13 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     { noPromptTokens: noPromptOptionTokens },
   );
 
-  const sparkExposure = computePromptExposure(
+  const sparkExposure = hasPromptExposure(
     record,
     [getQuestionOptionTokens("E1", "Yes, from media (radio, TV, social media)")],
     { noPromptTokens: noPromptOptionTokens },
   );
 
-  const signalExposure = computePromptExposure(
+  const signalExposure = hasPromptExposure(
     record,
     [getQuestionOptionTokens("E1", "Yes, from a partner/spouse")],
     { noPromptTokens: noPromptOptionTokens },
@@ -650,9 +642,12 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     descriptiveNorms,
     injunctiveNorms,
     systemReadiness,
-    promptFacilitator: facilitatorExposure ?? promptLikelihood ?? null,
-    promptSpark: sparkExposure ?? promptLikelihood ?? null,
-    promptSignal: signalExposure ?? promptLikelihood ?? null,
+    promptFacilitator: facilitatorExposure ? promptLikelihood ?? null : null,
+    promptSpark: sparkExposure ? promptLikelihood ?? null : null,
+    promptSignal: signalExposure ? promptLikelihood ?? null : null,
+    promptFacilitatorExposure: facilitatorExposure,
+    promptSparkExposure: sparkExposure,
+    promptSignalExposure: signalExposure,
     currentUse,
     motivationItems,
     abilityItems,
@@ -770,6 +765,9 @@ export interface AnalyticsSubmission {
   promptFacilitator: number | null;
   promptSpark: number | null;
   promptSignal: number | null;
+  promptFacilitatorExposure?: boolean;
+  promptSparkExposure?: boolean;
+  promptSignalExposure?: boolean;
   currentUse: boolean | null;
   submissionTime?: string;
   quadrant?: QuadrantId;
@@ -872,9 +870,14 @@ export interface SegmentSummary {
 export interface PromptEffectivenessRow {
   id: QuadrantId;
   name: string;
-  facilitator: number | null;
-  spark: number | null;
-  signal: number | null;
+  facilitator: PromptEffectivenessCell;
+  spark: PromptEffectivenessCell;
+  signal: PromptEffectivenessCell;
+}
+
+export interface PromptEffectivenessCell {
+  n: number;
+  useRate: number | null;
 }
 
 export type RegressionStrength = "strong" | "moderate" | "weak" | "indirect";
@@ -1039,6 +1042,9 @@ export function normalizeSubmissions(
     const promptSignal =
       parseNumber(lookupFieldValue(normalizedRecord, "promptSignal", fieldMap))
         ?? derived.promptSignal ?? null;
+    const promptFacilitatorExposure = derived.promptFacilitatorExposure;
+    const promptSparkExposure = derived.promptSparkExposure;
+    const promptSignalExposure = derived.promptSignalExposure;
 
     const age =
       parseNumber(lookupFieldValue(normalizedRecord, "age", fieldMap)) ?? derived.profile?.age ?? null;
@@ -1095,6 +1101,9 @@ export function normalizeSubmissions(
       promptFacilitator,
       promptSpark,
       promptSignal,
+      promptFacilitatorExposure,
+      promptSparkExposure,
+      promptSignalExposure,
       submissionTime,
       profile: {
         age,
@@ -1218,9 +1227,9 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
     return {
       id: quadrantId,
       name: meta.name,
-      facilitator: computePromptAverage(group, (item) => item.promptFacilitator),
-      spark: computePromptAverage(group, (item) => item.promptSpark),
-      signal: computePromptAverage(group, (item) => item.promptSignal),
+      facilitator: computePromptEffectivenessCell(group, (item) => item.promptFacilitatorExposure === true),
+      spark: computePromptEffectivenessCell(group, (item) => item.promptSparkExposure === true),
+      signal: computePromptEffectivenessCell(group, (item) => item.promptSignalExposure === true),
     };
   });
 
@@ -1496,8 +1505,8 @@ function toISODate(value?: string): string | undefined {
 
 function computeQuadrant(motivation: number | null, ability: number | null): QuadrantId | undefined {
   if (motivation == null || ability == null) return undefined;
-  const motivationHigh = motivation >= 3;
-  const abilityHigh = ability >= 3;
+  const motivationHigh = motivation >= 4;
+  const abilityHigh = ability >= 4;
 
   if (motivationHigh && abilityHigh) return "high_m_high_a";
   if (motivationHigh && !abilityHigh) return "high_m_low_a";
@@ -1572,11 +1581,19 @@ function averageFor(
   return average(submissions.map(selector));
 }
 
-function computePromptAverage(
+function computePromptEffectivenessCell(
   submissions: AnalyticsSubmission[],
-  selector: (submission: AnalyticsSubmission) => number | null,
-): number | null {
-  return average(submissions.map(selector));
+  isExposed: (submission: AnalyticsSubmission) => boolean,
+): PromptEffectivenessCell {
+  const exposed = submissions.filter(isExposed);
+  const withUseFlag = exposed.filter((item) => item.currentUse != null);
+
+  if (withUseFlag.length === 0) {
+    return { n: 0, useRate: null };
+  }
+
+  const useCount = withUseFlag.filter((item) => item.currentUse === true).length;
+  return { n: withUseFlag.length, useRate: useCount / withUseFlag.length };
 }
 
 function computePromptReceptivity(submission: AnalyticsSubmission): number | null {

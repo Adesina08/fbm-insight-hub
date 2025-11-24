@@ -160,20 +160,20 @@ const ExecutivePrintReport = ({
   const promptHighlights = promptEffectiveness
     .map((row) => {
       const entries = [
-        { key: "facilitator", label: "Facilitator prompts", value: row.facilitator },
-        { key: "spark", label: "Spark prompts", value: row.spark },
-        { key: "signal", label: "Signal prompts", value: row.signal },
-      ].filter((entry) => entry.value != null && !Number.isNaN(entry.value));
+        { key: "facilitator", label: "Facilitator prompts", cell: row.facilitator },
+        { key: "spark", label: "Spark prompts", cell: row.spark },
+        { key: "signal", label: "Signal prompts", cell: row.signal },
+      ].filter((entry) => entry.cell.useRate != null && !Number.isNaN(entry.cell.useRate));
 
       if (entries.length === 0) {
         return null;
       }
 
-      const best = entries.sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0];
+      const best = entries.sort((a, b) => (b.cell.useRate ?? 0) - (a.cell.useRate ?? 0))[0];
       return {
         quadrant: row.name,
         prompt: best.label,
-        score: best.value,
+        score: best.cell.useRate,
       };
     })
     .filter((item): item is { quadrant: string; prompt: string; score: number | null } => Boolean(item));
@@ -310,7 +310,7 @@ const ExecutivePrintReport = ({
               <tr>
                 <th>Quadrant</th>
                 <th>Priority prompt</th>
-                <th>Average effectiveness score (1–5)</th>
+                <th>Use rate among exposed</th>
               </tr>
             </thead>
             <tbody>
@@ -318,7 +318,7 @@ const ExecutivePrintReport = ({
                 <tr key={index}>
                   <td>{highlight.quadrant}</td>
                   <td>{highlight.prompt}</td>
-                  <td>{highlight.score == null ? "n/a" : highlight.score.toFixed(2)}</td>
+                  <td>{highlight.score == null ? "n/a" : `${(highlight.score * 100).toFixed(0)}%`}</td>
                 </tr>
               ))}
             </tbody>
