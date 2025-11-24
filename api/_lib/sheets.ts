@@ -2,6 +2,9 @@ import { createSign } from "node:crypto";
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const TOKEN_LIFETIME_SECONDS = 3600;
+const HARDCODED_SPREADSHEET_URL =
+  "https://docs.google.com/spreadsheets/d/1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ/edit?gid=0#gid=0";
+const HARDCODED_SPREADSHEET_ID = "1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ";
 
 interface ServiceAccountConfig {
   clientEmail: string;
@@ -160,12 +163,7 @@ function getSpreadsheetConfig(): SpreadsheetConfig {
     return cachedSpreadsheetConfig;
   }
 
-  const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-  if (!spreadsheetId) {
-    throw new Error("Missing required environment variable GOOGLE_SHEETS_ID.");
-  }
-
-  cachedSpreadsheetConfig = { spreadsheetId };
+  cachedSpreadsheetConfig = { spreadsheetId: HARDCODED_SPREADSHEET_ID };
   return cachedSpreadsheetConfig;
 }
 
@@ -301,7 +299,7 @@ export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
   const spreadsheetUrl =
     typeof payload.spreadsheetUrl === "string" && payload.spreadsheetUrl.length > 0
       ? payload.spreadsheetUrl
-      : null;
+      : HARDCODED_SPREADSHEET_URL;
   const title =
     typeof payload.properties?.title === "string" && payload.properties.title.trim().length > 0
       ? payload.properties.title.trim()
