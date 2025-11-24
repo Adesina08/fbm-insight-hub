@@ -8,6 +8,26 @@ interface SheetsDataResponse {
   results: Array<Record<string, unknown>>;
 }
 
+function logSheetsFetchError(range: string, error: unknown): void {
+  const errorPayload: Record<string, unknown> = {
+    event: "sheets-data-fetch-error",
+    range,
+  };
+
+  if (error instanceof Error) {
+    errorPayload.message = error.message;
+    errorPayload.name = error.name;
+    errorPayload.stack = error.stack;
+    if ("cause" in error && error.cause) {
+      errorPayload.cause = error.cause;
+    }
+  } else {
+    errorPayload.error = error;
+  }
+
+  console.error(JSON.stringify(errorPayload));
+}
+
 function getDataRange(): string {
   const range = process.env.GOOGLE_SHEETS_DATA_RANGE;
   if (!range || range.trim().length === 0) {
@@ -55,6 +75,7 @@ async function handleFetchRequest(req: Request): Promise<Response> {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to load Google Sheet data. Please try again later.";
+    logSheetsFetchError(range, error);
     return sendError(502, message);
   }
 }
@@ -88,6 +109,7 @@ async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Pro
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to load Google Sheet data. Please try again later.";
+    logSheetsFetchError(range, error);
     sendError(res, 502, message);
   }
 }

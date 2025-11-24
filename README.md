@@ -73,8 +73,11 @@ The dashboard now reads live data from a Google Sheet. Each row is treated like 
    - `GOOGLE_SHEETS_ID` – the spreadsheet ID (the segment between `/d/` and `/edit` in the sheet URL).
    - `GOOGLE_SHEETS_DATA_RANGE` – the A1 range that covers the header row and all submission rows (for example, `Form Responses!A:Z`).
    - (Optional) override the frontend field mappings (`VITE_SHEETS_FIELD_*`) if the column names in the sheet differ from the default question names used in the analytics module.
+   - `GOOGLE_SHEETS_API_KEY` (or `GOOGLE_API_KEY`) – required for public Sheets API access when running without the service account token flow.
 2. Share the sheet with the service account email so it can read values.
 3. Redeploy or restart `npm run dev` so the environment variables are picked up. The `/api/sheets-data` endpoint now streams rows from Google Sheets, and `/api/sheets-metadata` exposes sheet metadata for the UI card.
+
+Netlify builds run `npm run verify-env` before the Vite build, so deployments will fail fast if `GOOGLE_SHEETS_API_KEY`/`GOOGLE_API_KEY`, `GOOGLE_SHEETS_ID`, or `GOOGLE_SHEETS_DATA_RANGE` are missing.
 
 If the sheet cannot be reached, the UI surfaces descriptive error messages with retry actions.
 
