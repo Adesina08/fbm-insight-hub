@@ -1,26 +1,3 @@
-import { createSign } from "node:crypto";
-
-const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
-const TOKEN_LIFETIME_SECONDS = 3600;
-const HARDCODED_SPREADSHEET_URL =
-  "https://docs.google.com/spreadsheets/d/1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ/edit?gid=0#gid=0";
-const HARDCODED_SPREADSHEET_ID = "1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ";
-
-interface ServiceAccountConfig {
-  clientEmail: string;
-  privateKey: string;
-  tokenUri: string;
-}
-
-interface CachedToken {
-  accessToken: string;
-  expiresAt: number;
-}
-
-interface SpreadsheetConfig {
-  spreadsheetId: string;
-}
-
 export interface SpreadsheetMetadata {
   spreadsheetId: string;
   spreadsheetUrl: string | null;
@@ -29,321 +6,198 @@ export interface SpreadsheetMetadata {
   primarySheetTitle: string;
 }
 
-let cachedServiceAccount: ServiceAccountConfig | null = null;
-let cachedToken: CachedToken | null = null;
-let cachedSpreadsheetConfig: SpreadsheetConfig | null = null;
-let cachedPrimarySheetTitle: string | null = null;
+type LocalSheetData = {
+  metadata: SpreadsheetMetadata;
+  values: Record<string, unknown[][]>;
+};
 
-function base64UrlEncode(value: string | Buffer): string {
-  const buffer = typeof value === "string" ? Buffer.from(value) : value;
-  return buffer
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
+const LOCAL_PRIMARY_SHEET = "Survey Data";
 
-function getServiceAccount(): ServiceAccountConfig {
-  if (cachedServiceAccount) {
-    return cachedServiceAccount;
-  }
+const LOCAL_SHEETS: LocalSheetData = {
+  metadata: {
+    spreadsheetId: "local-spreadsheet",
+    spreadsheetUrl: null,
+    title: "Local Behavioural Insights",
+    timeZone: "UTC",
+    primarySheetTitle: LOCAL_PRIMARY_SHEET,
+  },
+  values: {
+    [LOCAL_PRIMARY_SHEET]: [
+      [
+        "_submission_time",
+        "motivation_score",
+        "ability_score",
+        "descriptive_norms",
+        "injunctive_norms",
+        "system_score",
+        "current_use",
+        "prompt_facilitator",
+        "prompt_spark",
+        "prompt_signal",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "parity",
+      ],
+      [
+        "2024-04-01T10:15:00Z",
+        4,
+        4.5,
+        3.8,
+        4.1,
+        4.3,
+        "yes",
+        4,
+        3.5,
+        4.2,
+        "Lagos",
+        "Ikeja",
+        "Urban",
+        "Female",
+        28,
+        "Married",
+        "Tertiary",
+        "Christianity",
+        "Employed",
+        "Teacher",
+        2,
+      ],
+      [
+        "2024-04-03T09:05:00Z",
+        3.2,
+        3.6,
+        3.1,
+        3.4,
+        3.7,
+        "no",
+        3,
+        2.8,
+        3.1,
+        "Kano",
+        "Nasarawa",
+        "Rural",
+        "Male",
+        32,
+        "Single",
+        "Secondary",
+        "Islam",
+        "Self-employed",
+        "Farmer",
+        3,
+      ],
+      [
+        "2024-04-06T14:40:00Z",
+        4.7,
+        4.2,
+        4.5,
+        4.6,
+        4.4,
+        "yes",
+        4.8,
+        4.2,
+        4.5,
+        "Lagos",
+        "Alimosho",
+        "Urban",
+        "Female",
+        24,
+        "Single",
+        "Tertiary",
+        "Christianity",
+        "Employed",
+        "Nurse",
+        1,
+      ],
+      [
+        "2024-04-10T08:30:00Z",
+        2.9,
+        3,
+        2.6,
+        2.9,
+        3.2,
+        "no",
+        2.4,
+        2.1,
+        2.7,
+        "Kaduna",
+        "Zaria",
+        "Rural",
+        "Male",
+        30,
+        "Married",
+        "Secondary",
+        "Islam",
+        "Unemployed",
+        "Student",
+        0,
+      ],
+      [
+        "2024-04-12T16:10:00Z",
+        3.9,
+        3.4,
+        3.7,
+        3.6,
+        3.9,
+        "yes",
+        3.5,
+        3.3,
+        3.2,
+        "Rivers",
+        "Port Harcourt",
+        "Urban",
+        "Female",
+        27,
+        "Married",
+        "Tertiary",
+        "Christianity",
+        "Employed",
+        "Engineer",
+        1,
+      ],
+    ],
+  },
+};
 
-  const coalescedJson = (() => {
-    const rawPrimary = process.env.GOOGLE_SERVICE_ACCOUNT;
-    if (rawPrimary && rawPrimary.trim().length > 0) {
-      return rawPrimary.trim();
-    }
+let cachedMetadata: SpreadsheetMetadata | null = null;
 
-    const rawBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_BASE64 ?? process.env.GOOGLE_SERVICE_ACCOUNT_B64;
-    if (rawBase64 && rawBase64.trim().length > 0) {
-      try {
-        return Buffer.from(rawBase64.trim(), "base64").toString("utf8");
-      } catch {
-        // Fall through and let the downstream validation throw a clearer error.
-      }
-    }
-
-    const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-    const privateKeyEnv = process.env.GOOGLE_PRIVATE_KEY;
-    if (clientEmail && privateKeyEnv) {
-      return JSON.stringify({ client_email: clientEmail, private_key: privateKeyEnv });
-    }
-
-    throw new Error(
-      "Missing Google credentials. Provide GOOGLE_SERVICE_ACCOUNT JSON, GOOGLE_SERVICE_ACCOUNT_BASE64, or GOOGLE_CLIENT_EMAIL + GOOGLE_PRIVATE_KEY.",
-    );
-  })();
-
-  const normalizedRaw = coalescedJson;
-  const jsonString =
-    (normalizedRaw.startsWith("\"") && normalizedRaw.endsWith("\"")) ||
-    (normalizedRaw.startsWith("'") && normalizedRaw.endsWith("'"))
-      ? normalizedRaw.slice(1, -1)
-      : normalizedRaw;
-
-  const decodeIfBase64Json = (value: string): string => {
-    try {
-      const decoded = Buffer.from(value, "base64").toString("utf8");
-      if (decoded.trim().startsWith("{") && decoded.trim().endsWith("}")) {
-        return decoded;
-      }
-    } catch {
-      // Not base64 JSON; continue with the raw string.
-    }
-    return value;
-  };
-
-  const hydratedJsonString = decodeIfBase64Json(jsonString);
-
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(hydratedJsonString);
-  } catch (error) {
-    throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT must contain valid JSON credentials. Remove surrounding quotes or ensure the base64 string decodes to JSON.",
-    );
-  }
-
-  const clientEmail = typeof parsed.client_email === "string" ? parsed.client_email : undefined;
-  const privateKeyRaw = typeof parsed.private_key === "string" ? parsed.private_key : undefined;
-  const tokenUri =
-    typeof parsed.token_uri === "string" && parsed.token_uri.trim().length > 0
-      ? parsed.token_uri.trim()
-      : "https://oauth2.googleapis.com/token";
-
-  if (!clientEmail || !privateKeyRaw) {
-    throw new Error(
-      "GOOGLE_SERVICE_ACCOUNT must include client_email and private_key fields.",
-    );
-  }
-
-  const normalizePrivateKey = (raw: string): string => {
-    const withNewlines = raw
-      .replace(/\\r\\n/g, "\n")
-      .replace(/\\n/g, "\n")
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n");
-
-    if (withNewlines.includes("BEGIN PRIVATE KEY")) {
-      return withNewlines;
-    }
-
-    // Some environments store the key as base64 without headers; attempt to decode and wrap.
-    try {
-      const decoded = Buffer.from(withNewlines, "base64").toString("utf8");
-      if (decoded.includes("BEGIN PRIVATE KEY")) {
-        return decoded;
-      }
-      if (/^[A-Za-z0-9+/=]+$/.test(withNewlines)) {
-        const wrappedBody = decoded.replace(/\s+/g, "").match(/.{1,64}/g)?.join("\n") ?? decoded;
-        return `-----BEGIN PRIVATE KEY-----\n${wrappedBody}\n-----END PRIVATE KEY-----`;
-      }
-    } catch {
-      // Fall through to the final wrapping logic below.
-    }
-
-    const sanitizedBody = withNewlines.replace(/\s+/g, "");
-    const wrapped = sanitizedBody.match(/.{1,64}/g)?.join("\n") ?? sanitizedBody;
-    return `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----`;
-  };
-
-  const privateKey = normalizePrivateKey(privateKeyRaw);
-
-  cachedServiceAccount = {
-    clientEmail,
-    privateKey,
-    tokenUri,
-  };
-
-  return cachedServiceAccount;
-}
-
-function getSpreadsheetConfig(): SpreadsheetConfig {
-  if (cachedSpreadsheetConfig) {
-    return cachedSpreadsheetConfig;
-  }
-
-  cachedSpreadsheetConfig = { spreadsheetId: HARDCODED_SPREADSHEET_ID };
-  return cachedSpreadsheetConfig;
-}
-
-async function getAccessToken(): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedToken.expiresAt - 60 > now) {
-    return cachedToken.accessToken;
-  }
-
-  const { clientEmail, privateKey, tokenUri } = getServiceAccount();
-
-  const header = base64UrlEncode(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const payload = base64UrlEncode(
-    JSON.stringify({
-      iss: clientEmail,
-      scope: SHEETS_SCOPE,
-      aud: tokenUri,
-      exp: now + TOKEN_LIFETIME_SECONDS,
-      iat: now,
-    }),
-  );
-
-  const unsignedToken = `${header}.${payload}`;
-  const signer = createSign("RSA-SHA256");
-  signer.update(unsignedToken);
-  signer.end();
-  const signature = base64UrlEncode(signer.sign(privateKey));
-  const assertion = `${unsignedToken}.${signature}`;
-
-  const body = new URLSearchParams({
-    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    assertion,
-  });
-
-  const response = await fetch(tokenUri, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok || !data || typeof data.access_token !== "string") {
-    const details =
-      data && typeof data.error_description === "string"
-        ? data.error_description
-        : data && typeof data.error === "string"
-          ? data.error
-          : "Unable to obtain Google access token.";
-    throw new Error(details);
-  }
-
-  const expiresIn = typeof data.expires_in === "number" ? data.expires_in : TOKEN_LIFETIME_SECONDS;
-
-  cachedToken = {
-    accessToken: data.access_token,
-    expiresAt: now + expiresIn,
-  };
-
-  return cachedToken.accessToken;
-}
-
-async function googleRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  const token = await getAccessToken();
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  const text = await response.text();
-  let parsed: T | null = null;
-  if (text.length > 0) {
-    try {
-      parsed = JSON.parse(text) as T;
-    } catch (error) {
-      throw new Error(`Failed to parse Google Sheets response: ${text.slice(0, 200)}`);
-    }
-  }
-
-  if (!response.ok) {
-    const message = parsed && typeof parsed === "object" && "error" in parsed
-      ? JSON.stringify((parsed as Record<string, unknown>).error)
-      : text || response.statusText;
-    throw new Error(`Google Sheets request failed (${response.status}): ${message}`);
-  }
-
-  if (!parsed) {
-    throw new Error("Google Sheets response was empty.");
-  }
-
-  return parsed;
+function cloneValues(values: unknown[][]): unknown[][] {
+  return values.map((row) => (Array.isArray(row) ? [...row] : []));
 }
 
 export async function fetchSheetValues(range?: string): Promise<unknown[][]> {
-  const { spreadsheetId } = getSpreadsheetConfig();
-  const effectiveRange = range || (await getPrimarySheetTitle());
-  const encodedRange = encodeURIComponent(effectiveRange);
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}` +
-    "?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING";
+  const sheetTitle = range ?? LOCAL_SHEETS.metadata.primarySheetTitle;
+  const values = LOCAL_SHEETS.values[sheetTitle];
 
-  const payload = await googleRequest<{ values?: unknown[][] }>(url);
-  return Array.isArray(payload.values) ? payload.values : [];
+  if (!values) {
+    throw new Error(`No local sheet data found for range "${sheetTitle}".`);
+  }
+
+  return cloneValues(values);
 }
 
 export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
-  const { spreadsheetId } = getSpreadsheetConfig();
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    "?fields=spreadsheetId,spreadsheetUrl,properties(title,timeZone)," +
-    "sheets(properties(title,index,gridProperties(rowCount,columnCount)))";
-
-  const payload = await googleRequest<{
-    spreadsheetId?: string;
-    spreadsheetUrl?: string;
-    properties?: { title?: string; timeZone?: string };
-    sheets?: Array<{
-      properties?: {
-        title?: string;
-        index?: number;
-        gridProperties?: { rowCount?: number; columnCount?: number };
-      };
-    }>;
-  }>(url);
-
-  const id = typeof payload.spreadsheetId === "string" ? payload.spreadsheetId : spreadsheetId;
-  const spreadsheetUrl =
-    typeof payload.spreadsheetUrl === "string" && payload.spreadsheetUrl.length > 0
-      ? payload.spreadsheetUrl
-      : HARDCODED_SPREADSHEET_URL;
-  const title =
-    typeof payload.properties?.title === "string" && payload.properties.title.trim().length > 0
-      ? payload.properties.title.trim()
-      : "Untitled spreadsheet";
-  const timeZone =
-    typeof payload.properties?.timeZone === "string" && payload.properties.timeZone.trim().length > 0
-      ? payload.properties.timeZone.trim()
-      : null;
-
-  const sheets = Array.isArray(payload.sheets) ? payload.sheets : [];
-  const primarySheet = sheets
-    .map((sheet) => {
-      const title = typeof sheet.properties?.title === "string" ? sheet.properties.title : null;
-      const index = typeof sheet.properties?.index === "number" ? sheet.properties.index : Number.POSITIVE_INFINITY;
-      return { title, index };
-    })
-    .filter((sheet) => sheet.title)
-    .sort((a, b) => a.index - b.index)[0];
-
-  const primarySheetTitle = primarySheet?.title ?? null;
-
-  if (!primarySheetTitle) {
-    throw new Error("No sheets were found in the configured spreadsheet.");
+  if (cachedMetadata) {
+    return cachedMetadata;
   }
 
-  cachedPrimarySheetTitle = primarySheetTitle;
-
-  return {
-    spreadsheetId: id,
-    spreadsheetUrl,
-    title,
-    timeZone,
-    primarySheetTitle,
-  };
+  cachedMetadata = { ...LOCAL_SHEETS.metadata };
+  return cachedMetadata;
 }
 
 export async function getPrimarySheetTitle(): Promise<string> {
-  if (cachedPrimarySheetTitle) {
-    return cachedPrimarySheetTitle;
+  if (cachedMetadata) {
+    return cachedMetadata.primarySheetTitle;
   }
 
   const metadata = await fetchSpreadsheetMetadata();
-  cachedPrimarySheetTitle = metadata.primarySheetTitle;
-  return cachedPrimarySheetTitle;
+  return metadata.primarySheetTitle;
 }
 
 export type SheetRecord = Record<string, unknown>;
