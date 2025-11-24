@@ -348,9 +348,32 @@ export async function getPrimarySheetTitle(): Promise<string> {
   return cachedPrimarySheetTitle;
 }
 
-export interface SheetRecord extends Record<string, unknown> {}
+export type SheetRecord = Record<string, unknown>;
 
-export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] {
+type HeaderInfo = {
+  label: string;
+  normalized: string;
+  baseNormalized: string;
+};
+
+function normalizeKey(value: string, fallback: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_{2,}/g, "_");
+
+  return normalized.length > 0 ? normalized : fallback;
+}
+
+function dedupeValue(value: string, seen: Map<string, number>): string {
+  const count = seen.get(value) ?? 0;
+  seen.set(value, count + 1);
+  return count === 0 ? value : `${value} (${count + 1})`;
+}
+
+function buildHeaderInfo(values: unknown[][]): HeaderInfo[] {
   if (!Array.isArray(values) || values.length === 0) {
     return [];
   }
@@ -360,12 +383,30 @@ export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] 
     return [];
   }
 
-  const headers = headerRow.map((cell, index) => {
-    if (typeof cell === "string" && cell.trim().length > 0) {
-      return cell.trim();
-    }
-    return `column_${index + 1}`;
+  const displayCounts = new Map<string, number>();
+  const normalizedCounts = new Map<string, number>();
+
+  return headerRow.map((cell, index) => {
+    const baseLabel =
+      typeof cell === "string" && cell.trim().length > 0 ? cell.trim() : `Column ${index + 1}`;
+    const label = dedupeValue(baseLabel, displayCounts);
+
+    const baseNormalized = normalizeKey(baseLabel, `column_${index + 1}`);
+    const normalized = dedupeValue(baseNormalized, normalizedCounts);
+
+    return { label, normalized, baseNormalized };
   });
+}
+
+export function extractHeaders(values: unknown[][]): string[] {
+  return buildHeaderInfo(values).map((header) => header.label);
+}
+
+export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] {
+  const headers = buildHeaderInfo(values);
+  if (headers.length === 0) {
+    return [];
+  }
 
   const specialMap: Record<string, string> = {
     submission_time: "_submission_time",
@@ -388,23 +429,15 @@ export function convertSheetValuesToRecords(values: unknown[][]): SheetRecord[] 
         return;
       }
 
-      record[header] = rawValue;
+      record[header.label] = rawValue;
 
-      if (typeof header === "string") {
-        const normalized = header
-          .trim()
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "_")
-          .replace(/^_+|_+$/g, "");
+      if (header.normalized && header.normalized !== header.label) {
+        record[header.normalized] = rawValue;
+      }
 
-        if (normalized && normalized !== header) {
-          record[normalized] = rawValue;
-        }
-
-        const mapped = specialMap[normalized];
-        if (mapped) {
-          record[mapped] = rawValue;
-        }
+      const mapped = specialMap[header.baseNormalized];
+      if (mapped) {
+        record[mapped] = rawValue;
       }
     });
 

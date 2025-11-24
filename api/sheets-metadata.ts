@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { handleOptionsRequest, jsonResponse, sendError, setCorsHeaders } from "./_lib/http";
 import {
   convertSheetValuesToRecords,
+  extractHeaders,
   fetchSheetValues,
   fetchSpreadsheetMetadata,
   type SheetRecord,
@@ -67,21 +68,6 @@ function computeLastUpdated(records: SheetRecord[]): string | null {
     }
   }
   return latest;
-}
-
-function extractHeaders(values: unknown[][]): string[] {
-  if (!Array.isArray(values) || values.length === 0) {
-    return [];
-  }
-
-  const headerRow = values[0];
-  if (!Array.isArray(headerRow)) {
-    return [];
-  }
-
-  return headerRow
-    .map((cell) => (typeof cell === "string" ? cell.trim() : ""))
-    .map((value, index) => (value.length > 0 ? value : `Column ${index + 1}`));
 }
 
 function sendJson(res: ServerResponse, payload: SheetInfoResponse): void {
