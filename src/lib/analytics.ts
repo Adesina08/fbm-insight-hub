@@ -827,6 +827,10 @@ export interface DescriptiveSubmission {
   motivation: number | null;
   ability: number | null;
   currentUse: boolean | null;
+  systemReadiness: number | null;
+  promptFacilitator: number | null;
+  promptSpark: number | null;
+  promptSignal: number | null;
   motivationItems: Partial<Record<MotivationSubdomainId, number | null>>;
   abilityItems: Partial<Record<AbilitySubdomainId, number | null>>;
   descriptiveNorms: number | null;
@@ -1299,6 +1303,10 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
       motivation: submission.motivation,
       ability: submission.ability,
       currentUse: submission.currentUse,
+      systemReadiness: submission.systemReadiness,
+      promptFacilitator: submission.promptFacilitator,
+      promptSpark: submission.promptSpark,
+      promptSignal: submission.promptSignal,
       motivationItems: submission.motivationItems,
       abilityItems: submission.abilityItems,
       descriptiveNorms: submission.descriptiveNorms,
