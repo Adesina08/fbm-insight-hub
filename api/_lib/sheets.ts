@@ -6,200 +6,6 @@ export interface SpreadsheetMetadata {
   primarySheetTitle: string;
 }
 
-type LocalSheetData = {
-  metadata: SpreadsheetMetadata;
-  values: Record<string, unknown[][]>;
-};
-
-const LOCAL_PRIMARY_SHEET = "Survey Data";
-
-const LOCAL_SHEETS: LocalSheetData = {
-  metadata: {
-    spreadsheetId: "local-spreadsheet",
-    spreadsheetUrl: null,
-    title: "Local Behavioural Insights",
-    timeZone: "UTC",
-    primarySheetTitle: LOCAL_PRIMARY_SHEET,
-  },
-  values: {
-    [LOCAL_PRIMARY_SHEET]: [
-      [
-        "_submission_time",
-        "motivation_score",
-        "ability_score",
-        "descriptive_norms",
-        "injunctive_norms",
-        "system_score",
-        "current_use",
-        "prompt_facilitator",
-        "prompt_spark",
-        "prompt_signal",
-        "A1",
-        "A2",
-        "A3",
-        "A4",
-        "A5",
-        "A6",
-        "A7",
-        "A8",
-        "A9",
-        "A10",
-        "parity",
-      ],
-      [
-        "2024-04-01T10:15:00Z",
-        4,
-        4.5,
-        3.8,
-        4.1,
-        4.3,
-        "yes",
-        4,
-        3.5,
-        4.2,
-        "Lagos",
-        "Ikeja",
-        "Urban",
-        "Female",
-        28,
-        "Married",
-        "Tertiary",
-        "Christianity",
-        "Employed",
-        "Teacher",
-        2,
-      ],
-      [
-        "2024-04-03T09:05:00Z",
-        3.2,
-        3.6,
-        3.1,
-        3.4,
-        3.7,
-        "no",
-        3,
-        2.8,
-        3.1,
-        "Kano",
-        "Nasarawa",
-        "Rural",
-        "Male",
-        32,
-        "Single",
-        "Secondary",
-        "Islam",
-        "Self-employed",
-        "Farmer",
-        3,
-      ],
-      [
-        "2024-04-06T14:40:00Z",
-        4.7,
-        4.2,
-        4.5,
-        4.6,
-        4.4,
-        "yes",
-        4.8,
-        4.2,
-        4.5,
-        "Lagos",
-        "Alimosho",
-        "Urban",
-        "Female",
-        24,
-        "Single",
-        "Tertiary",
-        "Christianity",
-        "Employed",
-        "Nurse",
-        1,
-      ],
-      [
-        "2024-04-10T08:30:00Z",
-        2.9,
-        3,
-        2.6,
-        2.9,
-        3.2,
-        "no",
-        2.4,
-        2.1,
-        2.7,
-        "Kaduna",
-        "Zaria",
-        "Rural",
-        "Male",
-        30,
-        "Married",
-        "Secondary",
-        "Islam",
-        "Unemployed",
-        "Student",
-        0,
-      ],
-      [
-        "2024-04-12T16:10:00Z",
-        3.9,
-        3.4,
-        3.7,
-        3.6,
-        3.9,
-        "yes",
-        3.5,
-        3.3,
-        3.2,
-        "Rivers",
-        "Port Harcourt",
-        "Urban",
-        "Female",
-        27,
-        "Married",
-        "Tertiary",
-        "Christianity",
-        "Employed",
-        "Engineer",
-        1,
-      ],
-    ],
-  },
-};
-
-let cachedMetadata: SpreadsheetMetadata | null = null;
-
-function cloneValues(values: unknown[][]): unknown[][] {
-  return values.map((row) => (Array.isArray(row) ? [...row] : []));
-}
-
-export async function fetchSheetValues(range?: string): Promise<unknown[][]> {
-  const sheetTitle = range ?? LOCAL_SHEETS.metadata.primarySheetTitle;
-  const values = LOCAL_SHEETS.values[sheetTitle];
-
-  if (!values) {
-    throw new Error(`No local sheet data found for range "${sheetTitle}".`);
-  }
-
-  return cloneValues(values);
-}
-
-export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
-  if (cachedMetadata) {
-    return cachedMetadata;
-  }
-
-  cachedMetadata = { ...LOCAL_SHEETS.metadata };
-  return cachedMetadata;
-}
-
-export async function getPrimarySheetTitle(): Promise<string> {
-  if (cachedMetadata) {
-    return cachedMetadata.primarySheetTitle;
-  }
-
-  const metadata = await fetchSpreadsheetMetadata();
-  return metadata.primarySheetTitle;
-}
-
 export type SheetRecord = Record<string, unknown>;
 
 type HeaderInfo = {
@@ -207,6 +13,45 @@ type HeaderInfo = {
   normalized: string;
   baseNormalized: string;
 };
+
+type GvizCell = {
+  v: unknown;
+  f?: string;
+};
+
+type GvizRow = {
+  c?: (GvizCell | null)[];
+};
+
+type GvizColumn = {
+  label?: string;
+  id?: string;
+};
+
+type GvizTable = {
+  cols?: GvizColumn[];
+  rows?: GvizRow[];
+  props?: {
+    sheetName?: string;
+    title?: string;
+    timeZone?: string;
+  };
+};
+
+type GvizResponse = {
+  table?: GvizTable;
+};
+
+const SPREADSHEET_ID = "1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ";
+const PRIMARY_SHEET_GID = "0";
+const SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit?gid=${PRIMARY_SHEET_GID}`;
+
+let cachedMetadata: SpreadsheetMetadata | null = null;
+const cachedValues = new Map<string, unknown[][]>();
+
+function cloneValues(values: unknown[][]): unknown[][] {
+  return values.map((row) => (Array.isArray(row) ? [...row] : []));
+}
 
 function normalizeKey(value: string, fallback: string): string {
   const normalized = value
@@ -248,6 +93,147 @@ function buildHeaderInfo(values: unknown[][]): HeaderInfo[] {
 
     return { label, normalized, baseNormalized };
   });
+}
+
+function parseGvizResponse(raw: string): GvizResponse {
+  const match = raw.match(/google\.visualization\.Query\.setResponse\((.*)\);?/s);
+  if (!match || !match[1]) {
+    throw new Error("Unexpected response format from Google Sheets.");
+  }
+
+  return JSON.parse(match[1]);
+}
+
+function extractValuesFromTable(table: GvizTable | undefined): unknown[][] {
+  if (!table) {
+    return [];
+  }
+
+  const headers = (table.cols ?? []).map((column, index) => {
+    if (column.label && column.label.trim().length > 0) {
+      return column.label.trim();
+    }
+    if (column.id && column.id.trim().length > 0) {
+      return column.id.trim();
+    }
+    return `Column ${index + 1}`;
+  });
+
+  const rows = (table.rows ?? []).map((row) => {
+    const cells = row.c ?? [];
+    return headers.map((_, index) => {
+      const cell = cells[index];
+      if (!cell) return null;
+      if (typeof cell === "object" && "f" in cell && cell.f != null) {
+        return cell.f;
+      }
+      if (typeof cell === "object" && "v" in cell) {
+        return (cell as GvizCell).v;
+      }
+      return null;
+    });
+  });
+
+  return [headers, ...rows];
+}
+
+function buildMetadata(table: GvizTable | undefined): SpreadsheetMetadata {
+  if (cachedMetadata) {
+    return cachedMetadata;
+  }
+
+  const primarySheetTitle =
+    table?.props?.sheetName?.trim() && table.props.sheetName.trim().length > 0
+      ? table.props.sheetName.trim()
+      : `gid:${PRIMARY_SHEET_GID}`;
+
+  const title =
+    table?.props?.title?.trim() && table.props.title.trim().length > 0
+      ? table.props.title.trim()
+      : "Google Sheets Data";
+
+  cachedMetadata = {
+    spreadsheetId: SPREADSHEET_ID,
+    spreadsheetUrl: SPREADSHEET_URL,
+    title,
+    timeZone: table?.props?.timeZone ?? null,
+    primarySheetTitle,
+  };
+
+  return cachedMetadata;
+}
+
+function getCacheKey(range?: string): string {
+  if (range?.startsWith("gid:")) {
+    return range;
+  }
+
+  if (range && range.trim().length > 0) {
+    return range.trim();
+  }
+
+  return `gid:${PRIMARY_SHEET_GID}`;
+}
+
+async function fetchRemoteSheet(range?: string): Promise<{ values: unknown[][]; metadata: SpreadsheetMetadata }> {
+  const params = new URLSearchParams({
+    tqx: "out:json",
+  });
+
+  const cacheKey = getCacheKey(range);
+
+  if (range?.startsWith("gid:")) {
+    params.set("gid", range.replace(/^gid:/, ""));
+  } else {
+    params.set("gid", PRIMARY_SHEET_GID);
+  }
+
+  if (range && !range.startsWith("gid:")) {
+    params.set("sheet", range);
+  }
+
+  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?${params.toString()}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load Google Sheet data (status ${response.status}).`);
+  }
+
+  const raw = await response.text();
+  const parsed = parseGvizResponse(raw);
+  const values = extractValuesFromTable(parsed.table);
+  const metadata = buildMetadata(parsed.table);
+
+  cachedValues.set(cacheKey, values);
+  return { values, metadata };
+}
+
+export async function fetchSheetValues(range?: string): Promise<unknown[][]> {
+  const cacheKey = getCacheKey(range);
+  const cached = cachedValues.get(cacheKey);
+  if (cached) {
+    return cloneValues(cached);
+  }
+
+  const { values } = await fetchRemoteSheet(range);
+  return cloneValues(values);
+}
+
+export async function fetchSpreadsheetMetadata(): Promise<SpreadsheetMetadata> {
+  if (cachedMetadata) {
+    return cachedMetadata;
+  }
+
+  const { metadata } = await fetchRemoteSheet();
+  return metadata;
+}
+
+export async function getPrimarySheetTitle(): Promise<string> {
+  if (cachedMetadata) {
+    return cachedMetadata.primarySheetTitle;
+  }
+
+  const metadata = await fetchSpreadsheetMetadata();
+  return metadata.primarySheetTitle;
 }
 
 export function extractHeaders(values: unknown[][]): string[] {
