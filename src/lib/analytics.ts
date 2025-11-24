@@ -14,9 +14,15 @@ export const DEFAULT_FIELD_MAP = {
   promptFacilitator: "prompt_facilitator",
   promptSpark: "prompt_spark",
   promptSignal: "prompt_signal",
+  state: "A1",
+  lga: "A2",
+  gender: "A4",
   age: "A5",
   maritalStatus: "A6",
   educationLevel: "A7",
+  religion: "A8",
+  employmentStatus: "A9",
+  occupation: "A10",
   location: "A3",
   parity: "parity",
 } as const;
@@ -498,9 +504,15 @@ export type MotivationSubdomainId = "C1" | "C2" | "C3" | "C4";
 export type AbilitySubdomainId = "D1" | "D2" | "D3" | "D4" | "D5" | "D6";
 
 export interface RespondentProfile {
+  state: string | null;
+  lga: string | null;
+  gender: string | null;
   age: number | null;
   maritalStatus: string | null;
   educationLevel: string | null;
+  religion: string | null;
+  employmentStatus: string | null;
+  occupation: string | null;
   location: string | null;
   parity: number | null;
 }
@@ -514,58 +526,50 @@ interface DerivedMetrics {
   promptFacilitator?: number | null;
   promptSpark?: number | null;
   promptSignal?: number | null;
+  promptFacilitatorExposure?: boolean;
+  promptSparkExposure?: boolean;
+  promptSignalExposure?: boolean;
   currentUse?: boolean | null;
   motivationItems?: Partial<Record<MotivationSubdomainId, number | null>>;
   abilityItems?: Partial<Record<AbilitySubdomainId, number | null>>;
   profile?: RespondentProfile;
 }
 
-function computePromptExposure(
+function hasPromptExposure(
   record: NormalizedRecord,
   groups: string[][],
   options?: { noPromptTokens?: string[] },
-): number | null {
+): boolean {
   if (options?.noPromptTokens) {
     const noPrompt = parseBoolean(getValueForTokens(record, options.noPromptTokens));
     if (noPrompt === true) {
-      return 1;
+      return false;
     }
   }
 
-  const exposures = groups.map((tokens) => {
+  return groups.some((tokens) => {
     const raw = getValueForTokens(record, tokens);
     const parsed = parseBoolean(raw);
     if (parsed != null) {
-      return parsed ? 1 : 0;
+      return parsed === true;
     }
-    if (typeof raw === "string") {
-      const normalized = normalizeTextValue(raw);
-      if (!normalized) {
-        return null;
-      }
-      if (normalized.includes("yes")) {
-        return 1;
-      }
-      if (normalized.includes("no")) {
-        return 0;
-      }
+
+    const likert = parseLikertScore(raw);
+    if (likert != null) {
+      return likert >= 4;
     }
-    if (typeof raw === "number") {
-      if (!Number.isFinite(raw)) {
-        return null;
-      }
-      return raw > 0 ? 1 : 0;
+
+    const numeric = parseNumber(raw);
+    if (numeric != null) {
+      return numeric > 0;
     }
-    return null;
+
+    const text = parseString(raw)?.toLowerCase();
+    if (!text) return false;
+    if (["yes", "true", "y", "1"].includes(text)) return true;
+    if (["no", "false", "n", "0"].includes(text)) return false;
+    return false;
   });
-
-  const valid = exposures.filter((value): value is number => value != null);
-  if (valid.length === 0) {
-    return null;
-  }
-
-  const ratio = valid.reduce((acc, value) => acc + value, 0) / valid.length;
-  return ratio * 4 + 1;
 }
 
 function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
@@ -585,7 +589,7 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     D6: parseLikertScore(getValueForQuestion(record, "D6")),
   };
 
-  const motivation = averageNumbers(Object.values(motivationItems));
+  const motivation = averageNumbers([motivationItems.C2, motivationItems.C3, motivationItems.C4]);
 
   const ability = averageNumbers(Object.values(abilityItems));
 
@@ -602,7 +606,7 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
   const noPromptTokens = getQuestionOptionTokens("E1", "No prompts received");
   const noPromptOptionTokens = noPromptTokens.length > 0 ? [...noPromptTokens] : undefined;
 
-  const facilitatorExposure = computePromptExposure(
+  const facilitatorExposure = hasPromptExposure(
     record,
     [
       getQuestionOptionTokens("E1", "Yes, from a health worker"),
@@ -611,13 +615,13 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     { noPromptTokens: noPromptOptionTokens },
   );
 
-  const sparkExposure = computePromptExposure(
+  const sparkExposure = hasPromptExposure(
     record,
     [getQuestionOptionTokens("E1", "Yes, from media (radio, TV, social media)")],
     { noPromptTokens: noPromptOptionTokens },
   );
 
-  const signalExposure = computePromptExposure(
+  const signalExposure = hasPromptExposure(
     record,
     [getQuestionOptionTokens("E1", "Yes, from a partner/spouse")],
     { noPromptTokens: noPromptOptionTokens },
@@ -632,9 +636,15 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
   }
 
   const profile: RespondentProfile = {
+    state: parseString(getValueForQuestion(record, "A1")),
+    lga: parseString(getValueForQuestion(record, "A2")),
+    gender: parseString(getValueForQuestion(record, "A4")),
     age: parseNumber(getValueForQuestion(record, "A5")),
     maritalStatus: parseString(getValueForQuestion(record, "A6")),
     educationLevel: parseString(getValueForQuestion(record, "A7")),
+    religion: parseString(getValueForQuestion(record, "A8")),
+    employmentStatus: parseString(getValueForQuestion(record, "A9")),
+    occupation: parseString(getValueForQuestion(record, "A10")),
     location: parseString(getValueForQuestion(record, "A3")),
     parity: parseNumber(
       getValueForTokens(record, ["parity"])
@@ -650,9 +660,12 @@ function deriveMetrics(record: NormalizedRecord): DerivedMetrics {
     descriptiveNorms,
     injunctiveNorms,
     systemReadiness,
-    promptFacilitator: facilitatorExposure ?? promptLikelihood ?? null,
-    promptSpark: sparkExposure ?? promptLikelihood ?? null,
-    promptSignal: signalExposure ?? promptLikelihood ?? null,
+    promptFacilitator: facilitatorExposure ? promptLikelihood ?? null : null,
+    promptSpark: sparkExposure ? promptLikelihood ?? null : null,
+    promptSignal: signalExposure ? promptLikelihood ?? null : null,
+    promptFacilitatorExposure: facilitatorExposure,
+    promptSparkExposure: sparkExposure,
+    promptSignalExposure: signalExposure,
     currentUse,
     motivationItems,
     abilityItems,
@@ -727,6 +740,17 @@ const FIELD_TOKEN_HINTS: Record<FieldKey, string[][]> = {
     ["signal", "prompt"],
     ["signal"],
   ],
+  state: [
+    ["state"],
+  ],
+  lga: [
+    ["lga"],
+    ["local", "government"],
+  ],
+  gender: [
+    ["gender"],
+    ["sex"],
+  ],
   age: [
     ["age"],
     ["respondent", "age"],
@@ -740,6 +764,20 @@ const FIELD_TOKEN_HINTS: Record<FieldKey, string[][]> = {
     ["education"],
     ["education", "level"],
     ["school", "level"],
+  ],
+  religion: [
+    ["religion"],
+    ["faith"],
+  ],
+  employmentStatus: [
+    ["employment"],
+    ["employment", "status"],
+    ["job", "status"],
+    ["work", "status"],
+  ],
+  occupation: [
+    ["occupation"],
+    ["job"],
   ],
   location: [
     ["location"],
@@ -770,6 +808,9 @@ export interface AnalyticsSubmission {
   promptFacilitator: number | null;
   promptSpark: number | null;
   promptSignal: number | null;
+  promptFacilitatorExposure?: boolean;
+  promptSparkExposure?: boolean;
+  promptSignalExposure?: boolean;
   currentUse: boolean | null;
   submissionTime?: string;
   quadrant?: QuadrantId;
@@ -816,11 +857,17 @@ export interface DescriptiveCategoryValue {
 }
 
 export interface DescriptiveSubmission {
+  state: DescriptiveCategoryValue | null;
+  lga: DescriptiveCategoryValue | null;
+  gender: DescriptiveCategoryValue | null;
   id: string;
   age: number | null;
   ageBucket: string | null;
   maritalStatus: DescriptiveCategoryValue | null;
   educationLevel: DescriptiveCategoryValue | null;
+  religion: DescriptiveCategoryValue | null;
+  employmentStatus: DescriptiveCategoryValue | null;
+  occupation: DescriptiveCategoryValue | null;
   location: DescriptiveCategoryValue | null;
   parity: number | null;
   parityBucket: string | null;
@@ -845,8 +892,14 @@ export interface DescriptiveFilterOption {
 
 export interface DescriptiveAnalyticsFilters {
   age: DescriptiveFilterOption[];
+  state: DescriptiveFilterOption[];
+  lga: DescriptiveFilterOption[];
+  gender: DescriptiveFilterOption[];
   maritalStatus: DescriptiveFilterOption[];
   educationLevel: DescriptiveFilterOption[];
+  religion: DescriptiveFilterOption[];
+  employmentStatus: DescriptiveFilterOption[];
+  occupation: DescriptiveFilterOption[];
   location: DescriptiveFilterOption[];
   parity: DescriptiveFilterOption[];
 }
@@ -872,9 +925,14 @@ export interface SegmentSummary {
 export interface PromptEffectivenessRow {
   id: QuadrantId;
   name: string;
-  facilitator: number | null;
-  spark: number | null;
-  signal: number | null;
+  facilitator: PromptEffectivenessCell;
+  spark: PromptEffectivenessCell;
+  signal: PromptEffectivenessCell;
+}
+
+export interface PromptEffectivenessCell {
+  n: number;
+  useRate: number | null;
 }
 
 export type RegressionStrength = "strong" | "moderate" | "weak" | "indirect";
@@ -1039,20 +1097,32 @@ export function normalizeSubmissions(
     const promptSignal =
       parseNumber(lookupFieldValue(normalizedRecord, "promptSignal", fieldMap))
         ?? derived.promptSignal ?? null;
+    const promptFacilitatorExposure = derived.promptFacilitatorExposure;
+    const promptSparkExposure = derived.promptSparkExposure;
+    const promptSignalExposure = derived.promptSignalExposure;
 
-    const age =
-      parseNumber(lookupFieldValue(normalizedRecord, "age", fieldMap)) ?? derived.profile?.age ?? null;
-    const maritalStatus =
-      parseString(lookupFieldValue(normalizedRecord, "maritalStatus", fieldMap))
-        ?? derived.profile?.maritalStatus ?? null;
-    const educationLevel =
-      parseString(lookupFieldValue(normalizedRecord, "educationLevel", fieldMap))
-        ?? derived.profile?.educationLevel ?? null;
-    const location =
-      parseString(lookupFieldValue(normalizedRecord, "location", fieldMap))
-        ?? derived.profile?.location ?? null;
-    const parity =
-      parseNumber(lookupFieldValue(normalizedRecord, "parity", fieldMap)) ?? derived.profile?.parity ?? null;
+    const state = parseString(lookupFieldValue(normalizedRecord, "state", fieldMap))
+      ?? derived.profile?.state ?? null;
+    const lga = parseString(lookupFieldValue(normalizedRecord, "lga", fieldMap))
+      ?? derived.profile?.lga ?? null;
+    const gender = parseString(lookupFieldValue(normalizedRecord, "gender", fieldMap))
+      ?? derived.profile?.gender ?? null;
+    const age = parseNumber(lookupFieldValue(normalizedRecord, "age", fieldMap))
+      ?? derived.profile?.age ?? null;
+    const maritalStatus = parseString(lookupFieldValue(normalizedRecord, "maritalStatus", fieldMap))
+      ?? derived.profile?.maritalStatus ?? null;
+    const educationLevel = parseString(lookupFieldValue(normalizedRecord, "educationLevel", fieldMap))
+      ?? derived.profile?.educationLevel ?? null;
+    const religion = parseString(lookupFieldValue(normalizedRecord, "religion", fieldMap))
+      ?? derived.profile?.religion ?? null;
+    const employmentStatus = parseString(lookupFieldValue(normalizedRecord, "employmentStatus", fieldMap))
+      ?? derived.profile?.employmentStatus ?? null;
+    const occupation = parseString(lookupFieldValue(normalizedRecord, "occupation", fieldMap))
+      ?? derived.profile?.occupation ?? null;
+    const location = parseString(lookupFieldValue(normalizedRecord, "location", fieldMap))
+      ?? derived.profile?.location ?? null;
+    const parity = parseNumber(lookupFieldValue(normalizedRecord, "parity", fieldMap))
+      ?? derived.profile?.parity ?? null;
 
     const motivationItems: Partial<Record<MotivationSubdomainId, number | null>> = {
       C1: derived.motivationItems?.C1 ?? null,
@@ -1095,11 +1165,20 @@ export function normalizeSubmissions(
       promptFacilitator,
       promptSpark,
       promptSignal,
+      promptFacilitatorExposure,
+      promptSparkExposure,
+      promptSignalExposure,
       submissionTime,
       profile: {
+        state,
+        lga,
+        gender,
         age,
         maritalStatus,
         educationLevel,
+        religion,
+        employmentStatus,
+        occupation,
         location,
         parity,
       },
@@ -1218,9 +1297,9 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
     return {
       id: quadrantId,
       name: meta.name,
-      facilitator: computePromptAverage(group, (item) => item.promptFacilitator),
-      spark: computePromptAverage(group, (item) => item.promptSpark),
-      signal: computePromptAverage(group, (item) => item.promptSignal),
+      facilitator: computePromptEffectivenessCell(group, (item) => item.promptFacilitatorExposure === true),
+      spark: computePromptEffectivenessCell(group, (item) => item.promptSparkExposure === true),
+      signal: computePromptEffectivenessCell(group, (item) => item.promptSignalExposure === true),
     };
   });
 
@@ -1285,18 +1364,30 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
   } satisfies DashboardAnalytics["stats"];
 
   const descriptiveSubmissions: DescriptiveSubmission[] = submissions.map((submission) => {
+    const state = normalizeCategoryValue(submission.profile.state);
+    const lga = normalizeCategoryValue(submission.profile.lga);
+    const gender = normalizeCategoryValue(submission.profile.gender);
     const maritalStatus = normalizeCategoryValue(submission.profile.maritalStatus);
     const educationLevel = normalizeCategoryValue(submission.profile.educationLevel);
+    const religion = normalizeCategoryValue(submission.profile.religion);
+    const employmentStatus = normalizeCategoryValue(submission.profile.employmentStatus);
+    const occupation = normalizeCategoryValue(submission.profile.occupation);
     const location = normalizeCategoryValue(submission.profile.location);
     const ageBucket = determineBucketValue(submission.profile.age, AGE_BUCKET_DEFINITIONS);
     const parityBucket = determineBucketValue(submission.profile.parity, PARITY_BUCKET_DEFINITIONS);
 
     return {
       id: submission.id,
+      state,
+      lga,
+      gender,
       age: submission.profile.age,
       ageBucket,
       maritalStatus,
       educationLevel,
+      religion,
+      employmentStatus,
+      occupation,
       location,
       parity: submission.profile.parity,
       parityBucket,
@@ -1317,9 +1408,17 @@ export function buildAnalyticsFromSubmissions(submissions: AnalyticsSubmission[]
   const descriptive: DescriptiveAnalytics = {
     submissions: descriptiveSubmissions,
     filters: {
+      state: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.state)),
+      lga: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.lga)),
+      gender: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.gender)),
       age: buildAgeFilterOptions(descriptiveSubmissions),
       maritalStatus: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.maritalStatus)),
       educationLevel: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.educationLevel)),
+      religion: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.religion)),
+      employmentStatus: buildCategoricalFilterOptions(
+        descriptiveSubmissions.map((item) => item.employmentStatus),
+      ),
+      occupation: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.occupation)),
       location: buildCategoricalFilterOptions(descriptiveSubmissions.map((item) => item.location)),
       parity: buildParityFilterOptions(descriptiveSubmissions),
     },
@@ -1496,8 +1595,8 @@ function toISODate(value?: string): string | undefined {
 
 function computeQuadrant(motivation: number | null, ability: number | null): QuadrantId | undefined {
   if (motivation == null || ability == null) return undefined;
-  const motivationHigh = motivation >= 3;
-  const abilityHigh = ability >= 3;
+  const motivationHigh = motivation >= 4;
+  const abilityHigh = ability >= 4;
 
   if (motivationHigh && abilityHigh) return "high_m_high_a";
   if (motivationHigh && !abilityHigh) return "high_m_low_a";
@@ -1572,11 +1671,19 @@ function averageFor(
   return average(submissions.map(selector));
 }
 
-function computePromptAverage(
+function computePromptEffectivenessCell(
   submissions: AnalyticsSubmission[],
-  selector: (submission: AnalyticsSubmission) => number | null,
-): number | null {
-  return average(submissions.map(selector));
+  isExposed: (submission: AnalyticsSubmission) => boolean,
+): PromptEffectivenessCell {
+  const exposed = submissions.filter(isExposed);
+  const withUseFlag = exposed.filter((item) => item.currentUse != null);
+
+  if (withUseFlag.length === 0) {
+    return { n: 0, useRate: null };
+  }
+
+  const useCount = withUseFlag.filter((item) => item.currentUse === true).length;
+  return { n: withUseFlag.length, useRate: useCount / withUseFlag.length };
 }
 
 function computePromptReceptivity(submission: AnalyticsSubmission): number | null {

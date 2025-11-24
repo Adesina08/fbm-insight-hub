@@ -77,9 +77,32 @@ function getServiceAccount(): ServiceAccountConfig {
     );
   }
 
-  const privateKey = privateKeyRaw.includes("BEGIN PRIVATE KEY")
-    ? privateKeyRaw.replace(/\\n/g, "\n")
-    : privateKeyRaw;
+  const normalizePrivateKey = (raw: string): string => {
+    const withNewlines = raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+    if (withNewlines.includes("BEGIN PRIVATE KEY")) {
+      return withNewlines;
+    }
+
+    // Some environments store the key as base64 without headers; attempt to decode and wrap.
+    try {
+      const decoded = Buffer.from(withNewlines, "base64").toString("utf8");
+      if (decoded.includes("BEGIN PRIVATE KEY")) {
+        return decoded;
+      }
+      if (/^[A-Za-z0-9+/=]+$/.test(withNewlines)) {
+        const wrappedBody = decoded.replace(/\s+/g, "").match(/.{1,64}/g)?.join("\n") ?? decoded;
+        return `-----BEGIN PRIVATE KEY-----\n${wrappedBody}\n-----END PRIVATE KEY-----`;
+      }
+    } catch {
+      // Fall through to the final wrapping logic below.
+    }
+
+    const sanitizedBody = withNewlines.replace(/\s+/g, "");
+    const wrapped = sanitizedBody.match(/.{1,64}/g)?.join("\n") ?? sanitizedBody;
+    return `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----`;
+  };
+
+  const privateKey = normalizePrivateKey(privateKeyRaw);
 
   cachedServiceAccount = {
     clientEmail,

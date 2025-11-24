@@ -398,12 +398,18 @@ const Index = () => {
 
   const demographicDistributions = useMemo(() => {
     const age = buildCategoryCounts((record) => record.ageBucket);
+    const state = buildCategoryCounts((record) => record.state?.label ?? null);
+    const lga = buildCategoryCounts((record) => record.lga?.label ?? null);
+    const gender = buildCategoryCounts((record) => record.gender?.label ?? null);
     const marital = buildCategoryCounts((record) => record.maritalStatus?.label ?? null);
     const education = buildCategoryCounts((record) => record.educationLevel?.label ?? null);
+    const religion = buildCategoryCounts((record) => record.religion?.label ?? null);
+    const employment = buildCategoryCounts((record) => record.employmentStatus?.label ?? null);
+    const occupation = buildCategoryCounts((record) => record.occupation?.label ?? null);
     const location = buildCategoryCounts((record) => record.location?.label ?? null);
     const parity = buildCategoryCounts((record) => record.parityBucket);
 
-    return { age, marital, education, location, parity };
+    return { age, state, lga, gender, marital, education, religion, employment, occupation, location, parity };
   }, [buildCategoryCounts]);
 
   const practiceDistribution = useMemo(
@@ -660,6 +666,27 @@ const Index = () => {
                     emptyMessage="Age values not available in the current dataset."
                   />
                   <CategoryDistributionChart
+                    title="State"
+                    subtitle="A1 · State of residence"
+                    data={demographicDistributions.state}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="States are missing from the dataset."
+                  />
+                  <CategoryDistributionChart
+                    title="LGA"
+                    subtitle="A2 · Local Government Area"
+                    data={demographicDistributions.lga}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="LGAs are missing from the dataset."
+                  />
+                  <CategoryDistributionChart
+                    title="Gender of respondent"
+                    subtitle="A4 · Self-reported gender"
+                    data={demographicDistributions.gender}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="Gender values not available in the dataset."
+                  />
+                  <CategoryDistributionChart
                     title="Location"
                     subtitle="A3 · Urban vs rural residence"
                     data={demographicDistributions.location}
@@ -677,6 +704,27 @@ const Index = () => {
                     subtitle="A7 · Highest level completed"
                     data={demographicDistributions.education}
                     isLoading={isAnalyticsLoading}
+                  />
+                  <CategoryDistributionChart
+                    title="Religion"
+                    subtitle="A8 · Faith affiliation"
+                    data={demographicDistributions.religion}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="No religion responses recorded yet."
+                  />
+                  <CategoryDistributionChart
+                    title="Employment status"
+                    subtitle="A9 · Current employment status"
+                    data={demographicDistributions.employment}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="Employment fields are missing from the dataset."
+                  />
+                  <CategoryDistributionChart
+                    title="Occupation or income source"
+                    subtitle="A10 · Primary occupation"
+                    data={demographicDistributions.occupation}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="Occupation values not available in the dataset."
                   />
                   <CategoryDistributionChart
                     title="Parity"
