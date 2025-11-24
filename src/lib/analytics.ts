@@ -3,6 +3,7 @@ import {
   QUESTIONNAIRE_QUESTION_LOOKUP,
 } from "./questionnaire";
 import type { QuestionnaireQuestion } from "./questionnaire";
+import { NORMALIZED_HEADER_MAP } from "./normalizedHeaders";
 
 export const DEFAULT_FIELD_MAP = {
   motivation: "motivation_score",
@@ -14,17 +15,18 @@ export const DEFAULT_FIELD_MAP = {
   promptFacilitator: "prompt_facilitator",
   promptSpark: "prompt_spark",
   promptSignal: "prompt_signal",
-  state: "A1",
-  lga: "A2",
-  gender: "A4",
-  age: "A5",
-  maritalStatus: "A6",
-  educationLevel: "A7",
-  religion: "A8",
-  employmentStatus: "A9",
-  occupation: "A10",
-  location: "A3",
-  parity: "parity",
+  state: NORMALIZED_HEADER_MAP["A1. State"],
+  lga: NORMALIZED_HEADER_MAP["A2. LGA"],
+  gender: NORMALIZED_HEADER_MAP["A4. Gender of respondent"],
+  age: NORMALIZED_HEADER_MAP["A5. How old are you (in completed years)?"],
+  maritalStatus: NORMALIZED_HEADER_MAP["A6. What is your current marital status?"],
+  educationLevel:
+    NORMALIZED_HEADER_MAP["A7. What is the highest level of formal education you have completed?"],
+  religion: NORMALIZED_HEADER_MAP["A8. What is your religion?"],
+  employmentStatus: NORMALIZED_HEADER_MAP["A9. What is your current employment status?"],
+  occupation: NORMALIZED_HEADER_MAP["A10. What is your main occupation or source of income?"],
+  location: NORMALIZED_HEADER_MAP["A3. Location"],
+  parity: NORMALIZED_HEADER_MAP["Parity (number of children ever born)"],
 } as const;
 
 export type FieldKey = keyof typeof DEFAULT_FIELD_MAP;
@@ -1043,14 +1045,6 @@ export function resolveFieldMap(overrides?: Partial<FieldMap>): FieldMap {
 
   const envVars = import.meta.env as Record<string, string | undefined> | undefined;
 
-  (Object.keys(map) as FieldKey[]).forEach((key) => {
-    const envKey = `VITE_SHEETS_FIELD_${key.toUpperCase()}`;
-    const override = envVars?.[envKey];
-    if (override && typeof override === "string" && override.trim().length > 0) {
-      map[key] = override.trim();
-    }
-  });
-
   if (overrides) {
     (Object.keys(overrides) as FieldKey[]).forEach((key) => {
       const value = overrides[key];
@@ -1059,6 +1053,14 @@ export function resolveFieldMap(overrides?: Partial<FieldMap>): FieldMap {
       }
     });
   }
+
+  (Object.keys(map) as FieldKey[]).forEach((key) => {
+    const envKey = `VITE_SHEETS_FIELD_${key.toUpperCase()}`;
+    const override = envVars?.[envKey];
+    if (override && typeof override === "string" && override.trim().length > 0) {
+      map[key] = override.trim();
+    }
+  });
 
   return map as FieldMap;
 }
