@@ -137,6 +137,33 @@ function extractValuesFromTable(table: GvizTable | undefined): unknown[][] {
   return [headers, ...rows];
 }
 
+function trimLeadingEmptyColumns(values: unknown[][]): unknown[][] {
+  if (!Array.isArray(values) || values.length === 0) {
+    return values;
+  }
+
+  const headerRow = values[0];
+  if (!Array.isArray(headerRow) || headerRow.length === 0) {
+    return values;
+  }
+
+  const firstNonEmptyHeaderIndex = headerRow.findIndex(
+    (cell) => typeof cell === "string" && cell.trim().length > 0,
+  );
+
+  if (firstNonEmptyHeaderIndex <= 0) {
+    return values;
+  }
+
+  return values.map((row) => {
+    if (!Array.isArray(row)) {
+      return row;
+    }
+
+    return row.slice(firstNonEmptyHeaderIndex);
+  });
+}
+
 function buildMetadata(table: GvizTable | undefined): SpreadsheetMetadata {
   if (cachedMetadata) {
     return cachedMetadata;
@@ -200,7 +227,7 @@ async function fetchRemoteSheet(range?: string): Promise<{ values: unknown[][]; 
 
   const raw = await response.text();
   const parsed = parseGvizResponse(raw);
-  const values = extractValuesFromTable(parsed.table);
+  const values = trimLeadingEmptyColumns(extractValuesFromTable(parsed.table));
   const metadata = buildMetadata(parsed.table);
 
   cachedValues.set(cacheKey, values);
