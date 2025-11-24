@@ -17,11 +17,13 @@ const PROMPT_FIELDS = [
   { key: "signal", label: "Signal" },
 ] as const;
 
-const formatCellValue = (value: number | null) => {
-  if (value == null || Number.isNaN(value)) {
+type PromptKey = (typeof PROMPT_FIELDS)[number]["key"];
+
+const formatCellValue = (cell: PromptEffectivenessRow[PromptKey]) => {
+  if (cell.useRate == null || Number.isNaN(cell.useRate)) {
     return "n/a";
   }
-  return value.toFixed(2);
+  return `${(cell.useRate * 100).toFixed(0)}%`;
 };
 
 const toRgb = (hex: string): [number, number, number] => {
@@ -84,22 +86,20 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
   }
 
   const numericValues = rows
-    .flatMap((row) => PROMPT_FIELDS.map(({ key }) => row[key]))
+    .flatMap((row) => PROMPT_FIELDS.map(({ key }) => row[key].useRate))
     .filter((value): value is number => value != null && Number.isFinite(value));
   const minValue = numericValues.length > 0 ? Math.min(...numericValues) : 0;
-  const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 0;
-  const scaleMin = Math.min(1, minValue);
-  const preliminaryMax = Math.max(5, maxValue);
-  const scaleMax = scaleMin === preliminaryMax ? scaleMin + 1 : preliminaryMax;
+  const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 1;
+  const scaleMax = minValue === maxValue ? minValue + 1 : maxValue;
 
-  const getCellVisuals = (value: number | null) => {
-    if (value == null || Number.isNaN(value)) {
+  const getCellVisuals = (value: PromptEffectivenessRow[PromptKey]) => {
+    if (value.useRate == null || Number.isNaN(value.useRate)) {
       return {
         background: "var(--muted)",
         text: "var(--muted-foreground)",
       };
     }
-    const ratio = (value - scaleMin) / (scaleMax - scaleMin);
+    const ratio = (value.useRate - minValue) / (scaleMax - minValue);
     return {
       background: lerpColor(ratio, "#dbeafe", "#1e3a8a"),
       text: ratio > 0.55 ? "#f8fafc" : "#0f172a",
@@ -109,7 +109,7 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
   let topCell: { segment: string; prompt: string; value: number } | null = null;
   rows.forEach((row) => {
     PROMPT_FIELDS.forEach(({ key, label }) => {
-      const value = row[key];
+      const value = row[key].useRate;
       if (value != null && Number.isFinite(value) && (!topCell || value > topCell.value)) {
         topCell = { segment: row.name, prompt: label, value };
       }
@@ -126,7 +126,7 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
           <div>
             <CardTitle className="text-2xl">Prompt Effectiveness by Segment</CardTitle>
             <CardDescription className="text-base mt-1">
-              Average prompt scores derived from the latest submissions (1–5 scale)
+              Current contraceptive use among respondents exposed to each prompt type within their FBM quadrant.
             </CardDescription>
           </div>
         </div>
@@ -166,12 +166,12 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
                     >
                       {row.name}
                     </th>
-                    {PROMPT_FIELDS.map(({ key, label }) => {
-                      const value = row[key] ?? null;
-                      const visuals = getCellVisuals(value);
-                      return (
-                        <td key={`${row.id}-${label}`} className="px-3 py-3">
-                          <div
+                  {PROMPT_FIELDS.map(({ key, label }) => {
+                    const value = row[key];
+                    const visuals = getCellVisuals(value);
+                    return (
+                      <td key={`${row.id}-${label}`} className="px-3 py-3">
+                        <div
                             className="flex min-h-[88px] flex-col items-center justify-center rounded-xl border border-white/10 shadow-sm"
                             style={{
                               background: visuals.background,
@@ -179,7 +179,9 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
                             }}
                           >
                             <span className="text-lg font-semibold">{formatCellValue(value)}</span>
-                            <span className="text-[11px] uppercase tracking-wide opacity-80">Avg score</span>
+                            <span className="text-[11px] uppercase tracking-wide opacity-80">
+                              {value.n > 0 ? `${value.n} exposed` : "No exposure"}
+                            </span>
                           </div>
                         </td>
                       );
@@ -191,33 +193,33 @@ const PromptEffectivenessHeatmap = ({ rows, isLoading = false, error }: PromptEf
           </div>
         </div>
         <div className="flex flex-col gap-4 rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Scale</span>
-            <div className="h-2 w-36 rounded-full bg-gradient-to-r from-[#dbeafe] via-[#60a5fa] to-[#1e3a8a]" />
-            <div className="flex items-center gap-2 text-xs">
-              <span>Low</span>
-              <span className="font-semibold text-foreground">High</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Use rate among exposed</span>
+              <div className="h-2 w-36 rounded-full bg-gradient-to-r from-[#dbeafe] via-[#60a5fa] to-[#1e3a8a]" />
+              <div className="flex items-center gap-2 text-xs">
+                <span>0%</span>
+                <span className="font-semibold text-foreground">100%</span>
+              </div>
             </div>
+            {topCell ? (
+              <Badge variant="secondary" className="w-fit bg-background/80 px-4 py-2 text-xs font-medium text-foreground shadow-sm">
+                {topCell.prompt} prompts resonate most with {topCell.segment} ({(topCell.value * 100).toFixed(0)}% use rate)
+              </Badge>
+            ) : null}
           </div>
-          {topCell ? (
-            <Badge variant="secondary" className="w-fit bg-background/80 px-4 py-2 text-xs font-medium text-foreground shadow-sm">
-              {topCell.prompt} prompts resonate most with {topCell.segment} ({topCell.value.toFixed(2)} / 5)
-            </Badge>
-          ) : null}
-        </div>
-        <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
-          <p className="text-foreground">
-            {topCell
-              ? `${topCell.prompt} prompts score highest with ${topCell.segment} (${topCell.value.toFixed(2)} / 5).`
-              : "Prompt scores were present but no numeric values could be summarised."}
-          </p>
-          <p className="mt-2 text-xs">
-            Scores span the observed range of {formatCellValue(scaleMin)} to {formatCellValue(scaleMax)}, with deeper blues
-            representing stronger average responses.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+            <p className="text-foreground">
+              {topCell
+                ? `${topCell.prompt} prompts show the highest current-use rate with ${topCell.segment} (${(topCell.value * 100).toFixed(0)}%).`
+                : "Prompt scores were present but no numeric values could be summarised."}
+            </p>
+            <p className="mt-2 text-xs">
+              Observed use rates range from {(minValue * 100).toFixed(0)}% to {(scaleMax * 100).toFixed(0)}%, with deeper blues
+              representing stronger average responses.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
   );
 };
 
