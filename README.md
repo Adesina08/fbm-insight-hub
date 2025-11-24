@@ -60,6 +60,10 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Reusable FBM coding prompt
+
+Need to spin up new dashboard ideas quickly? Use the master prompt in [`docs/fbm-dashboard-master-prompt.md`](docs/fbm-dashboard-master-prompt.md) to brief ChatGPT/Copilot on the contraception FBM dashboard, including the data structure, derived metrics, quadrants, segmentation rules, and tab-by-tab visualization needs.
+
 ## Connecting to Google Sheets
 
 The dashboard now reads live data from a Google Sheet. Each row is treated like a survey submission, so the analytics continue to work without code changes. To enable the integration:
