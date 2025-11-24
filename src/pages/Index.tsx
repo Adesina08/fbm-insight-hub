@@ -1,4 +1,4 @@
-import { type ChangeEvent, useId, useRef, useState } from "react";
+import { type ChangeEvent, useId, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Users,
@@ -22,6 +22,11 @@ import PromptEffectivenessHeatmap from "@/components/dashboard/PromptEffectivene
 import PathDiagram from "@/components/dashboard/PathDiagram";
 import PDFExportButton from "@/components/dashboard/PDFExportButton";
 import ExecutivePrintReport from "@/components/dashboard/ExecutivePrintReport";
+import {
+  CategoryDistributionChart,
+  CrossTabUseChart,
+  LikertDistributionChart,
+} from "@/components/dashboard/FrequencyCharts";
 import { useSheetsAnalytics } from "@/hooks/useSheetsAnalytics";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -282,6 +287,144 @@ const Index = () => {
   const analyticsError = isLiveMode && isError ? error?.message ?? "Unable to load analytics data." : null;
   const retryHandler = isLiveMode ? refetch : undefined;
 
+  const descriptiveSubmissions = analytics?.descriptive?.submissions ?? [];
+
+  const buildCategoryCounts = useMemo(
+    () =>
+      function buildCategoryCounts(getValue: (record: (typeof descriptiveSubmissions)[number]) => string | null | undefined) {
+        const counts = new Map<string, number>();
+        descriptiveSubmissions.forEach((record) => {
+          const value = getValue(record) ?? "Unknown";
+          counts.set(value, (counts.get(value) ?? 0) + 1);
+        });
+        return Array.from(counts.entries())
+          .map(([label, count]) => ({ label, count }))
+          .sort((a, b) => b.count - a.count);
+      },
+    [descriptiveSubmissions],
+  );
+
+  const buildLikertCounts = useMemo(
+    () =>
+      function buildLikertCounts(values: Array<number | null | undefined>) {
+        const baseBuckets = new Map<string, number>([
+          ["1", 0],
+          ["2", 0],
+          ["3", 0],
+          ["4", 0],
+          ["5", 0],
+          ["Missing", 0],
+        ]);
+
+        values.forEach((value) => {
+          if (value == null || Number.isNaN(value)) {
+            baseBuckets.set("Missing", (baseBuckets.get("Missing") ?? 0) + 1);
+            return;
+          }
+          const bucket = Math.min(5, Math.max(1, Math.round(value))).toString();
+          baseBuckets.set(bucket, (baseBuckets.get(bucket) ?? 0) + 1);
+        });
+
+        return Array.from(baseBuckets.entries())
+          .map(([bucket, count]) => ({ bucket, count }))
+          .filter((item) => item.count > 0);
+      },
+    [],
+  );
+
+  const behaviorVariationData = useMemo(() => {
+    const submissionsWithUse = descriptiveSubmissions.filter((record) => record.currentUse != null);
+
+    const computeRate = (
+      label: string,
+      getLevel: (value: number | null) => "high" | "low" | "skip",
+      getValue: (record: (typeof descriptiveSubmissions)[number]) => number | null,
+    ) => {
+      let lowUse = 0;
+      let lowTotal = 0;
+      let highUse = 0;
+      let highTotal = 0;
+
+      submissionsWithUse.forEach((record) => {
+        const value = getValue(record);
+        const level = getLevel(value);
+        if (level === "skip") return;
+        const incrementUse = record.currentUse === true ? 1 : 0;
+        if (level === "low") {
+          lowTotal += 1;
+          lowUse += incrementUse;
+        } else {
+          highTotal += 1;
+          highUse += incrementUse;
+        }
+      });
+
+      if (lowTotal === 0 && highTotal === 0) {
+        return null;
+      }
+
+      return {
+        category: label,
+        low: lowTotal > 0 ? (lowUse / lowTotal) * 100 : null,
+        high: highTotal > 0 ? (highUse / highTotal) * 100 : null,
+      };
+    };
+
+    const results = [
+      computeRate("Motivation", (value) => (value == null ? "skip" : value >= 4 ? "high" : "low"), (r) => r.motivation),
+      computeRate("Ability", (value) => (value == null ? "skip" : value >= 4 ? "high" : "low"), (r) => r.ability),
+      computeRate(
+        "Descriptive norms",
+        (value) => (value == null ? "skip" : value >= 4 ? "high" : "low"),
+        (r) => r.descriptiveNorms,
+      ),
+      computeRate(
+        "Injunctive norms",
+        (value) => {
+          if (value == null || value === 4) return "skip";
+          return value === 1 ? "high" : "low";
+        },
+        (r) => r.injunctiveNorms,
+      ),
+      computeRate(
+        "System readiness",
+        (value) => (value == null ? "skip" : value >= 4 ? "high" : "low"),
+        (r) => r.systemReadiness,
+      ),
+    ].filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+    return results;
+  }, [descriptiveSubmissions]);
+
+  const demographicDistributions = useMemo(() => {
+    const age = buildCategoryCounts((record) => record.ageBucket);
+    const marital = buildCategoryCounts((record) => record.maritalStatus?.label ?? null);
+    const education = buildCategoryCounts((record) => record.educationLevel?.label ?? null);
+    const location = buildCategoryCounts((record) => record.location?.label ?? null);
+    const parity = buildCategoryCounts((record) => record.parityBucket);
+
+    return { age, marital, education, location, parity };
+  }, [buildCategoryCounts]);
+
+  const practiceDistribution = useMemo(
+    () =>
+      buildCategoryCounts((record) => {
+        if (record.currentUse == null) return "Unknown";
+        return record.currentUse ? "Currently using" : "Not using";
+      }),
+    [buildCategoryCounts],
+  );
+
+  const fbmLikertDistributions = useMemo(() => {
+    const motivation = buildLikertCounts(descriptiveSubmissions.map((record) => record.motivation));
+    const ability = buildLikertCounts(descriptiveSubmissions.map((record) => record.ability));
+    const descriptiveNorms = buildLikertCounts(descriptiveSubmissions.map((record) => record.descriptiveNorms));
+    const injunctiveNorms = buildLikertCounts(descriptiveSubmissions.map((record) => record.injunctiveNorms));
+    const system = buildLikertCounts(descriptiveSubmissions.map((record) => record.systemReadiness));
+
+    return { motivation, ability, descriptiveNorms, injunctiveNorms, system };
+  }, [buildLikertCounts, descriptiveSubmissions]);
+
   return (
     <div
       ref={reportRef}
@@ -508,6 +651,41 @@ const Index = () => {
                     ]}
                   />
                 </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <CategoryDistributionChart
+                    title="Age distribution"
+                    subtitle="A5 · Completed years grouped by bucket"
+                    data={demographicDistributions.age}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="Age values not available in the current dataset."
+                  />
+                  <CategoryDistributionChart
+                    title="Location"
+                    subtitle="A3 · Urban vs rural residence"
+                    data={demographicDistributions.location}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="Location values are missing from the dataset."
+                  />
+                  <CategoryDistributionChart
+                    title="Marital status"
+                    subtitle="A6 · Current marital/cohabitation status"
+                    data={demographicDistributions.marital}
+                    isLoading={isAnalyticsLoading}
+                  />
+                  <CategoryDistributionChart
+                    title="Education level"
+                    subtitle="A7 · Highest level completed"
+                    data={demographicDistributions.education}
+                    isLoading={isAnalyticsLoading}
+                  />
+                  <CategoryDistributionChart
+                    title="Parity"
+                    subtitle="Derived buckets of number of children"
+                    data={demographicDistributions.parity}
+                    isLoading={isAnalyticsLoading}
+                    emptyMessage="Parity fields (A-series) were not detected in the dataset."
+                  />
+                </div>
               </section>
             </TabsContent>
 
@@ -540,6 +718,13 @@ const Index = () => {
                     ]}
                   />
                 </div>
+                <CategoryDistributionChart
+                  title="Current use of contraception"
+                  subtitle="B2 · Practice distribution"
+                  data={practiceDistribution}
+                  isLoading={isAnalyticsLoading}
+                  emptyMessage="No B2 responses found to calculate practice levels."
+                />
               </section>
             </TabsContent>
 
@@ -580,6 +765,38 @@ const Index = () => {
                     ]}
                   />
                 </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <LikertDistributionChart
+                    title="Motivation distribution"
+                    subtitle="C2–C4 · Low (1–3) vs High (4–5)"
+                    data={fbmLikertDistributions.motivation}
+                    isLoading={isAnalyticsLoading}
+                  />
+                  <LikertDistributionChart
+                    title="Ability distribution"
+                    subtitle="D1–D4 · Low (1–3) vs High (4–5)"
+                    data={fbmLikertDistributions.ability}
+                    isLoading={isAnalyticsLoading}
+                  />
+                  <LikertDistributionChart
+                    title="Descriptive norms"
+                    subtitle="F1 · Community prevalence (1–3 Low, 4–5 High)"
+                    data={fbmLikertDistributions.descriptiveNorms}
+                    isLoading={isAnalyticsLoading}
+                  />
+                  <LikertDistributionChart
+                    title="Injunctive norms"
+                    subtitle="F2 · Approval (1 High, 2–3 Low, 4 Missing/Uncertain)"
+                    data={fbmLikertDistributions.injunctiveNorms}
+                    isLoading={isAnalyticsLoading}
+                  />
+                  <LikertDistributionChart
+                    title="System readiness"
+                    subtitle="G1–G3 · Reliability, respect, and access (1–3 Low, 4–5 High)"
+                    data={fbmLikertDistributions.system}
+                    isLoading={isAnalyticsLoading}
+                  />
+                </div>
               </section>
             </TabsContent>
 
@@ -603,6 +820,12 @@ const Index = () => {
                     "Behavior × System readiness",
                     "Run chi-square tests for each categorical comparison to flag significance",
                   ]}
+                />
+                <CrossTabUseChart
+                  title="Contraceptive use by FBM, norms, and system level"
+                  subtitle="Behaviour × levels (Low vs High)"
+                  data={behaviorVariationData}
+                  isLoading={isAnalyticsLoading}
                 />
               </section>
             </TabsContent>
