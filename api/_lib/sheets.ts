@@ -42,8 +42,24 @@ type GvizResponse = {
   table?: GvizTable;
 };
 
-const SPREADSHEET_ID = "1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ";
-const PRIMARY_SHEET_GID = "0";
+const DEFAULT_SPREADSHEET_ID = "1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ";
+const DEFAULT_PRIMARY_SHEET_GID = "0";
+
+function readEnv(key: string): string | null {
+  const value = process.env[key];
+  return value && value.trim().length > 0 ? value.trim() : null;
+}
+
+const SPREADSHEET_ID =
+  readEnv("GOOGLE_SHEETS_SPREADSHEET_ID") ??
+  readEnv("GOOGLE_SHEETS_ID") ??
+  DEFAULT_SPREADSHEET_ID;
+
+const PRIMARY_SHEET_GID =
+  readEnv("GOOGLE_SHEETS_PRIMARY_GID") ??
+  readEnv("GOOGLE_SHEETS_GID") ??
+  DEFAULT_PRIMARY_SHEET_GID;
+
 const SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit?gid=${PRIMARY_SHEET_GID}`;
 
 let cachedMetadata: SpreadsheetMetadata | null = null;
