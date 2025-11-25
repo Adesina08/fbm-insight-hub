@@ -66,13 +66,15 @@ Need to spin up new dashboard ideas quickly? Use the master prompt in [`docs/fbm
 
 ## Connecting to Google Sheets
 
-The dashboard now reads live data from a Google Sheet. Each row is treated like a survey submission, so the analytics continue to work without code changes. The application is pinned to the following spreadsheet and does not require a configurable sheet ID:
+The dashboard now reads live data from a Google Sheet. Each row is treated like a survey submission, so the analytics continue to work without code changes. By default the application points to the following spreadsheet:
 
 - https://docs.google.com/spreadsheets/d/1yKC2mbdaHO3o7e4JRu9GEGyjlhSl9GhvEeC9pUIxxoQ/edit?gid=0#gid=0
 
 To enable the integration:
 
 1. Copy `.env.example` to `.env` and populate the following **server-side** variables (no `VITE_` prefix):
+   - (Optional) `GOOGLE_SHEETS_SPREADSHEET_ID` to read from your own spreadsheet instead of the default ID above.
+   - (Optional) `GOOGLE_SHEETS_PRIMARY_GID` if your primary tab uses a gid other than `0`.
    - `GOOGLE_SERVICE_ACCOUNT` – the entire JSON credentials document for a service account with access to the sheet (base64 or raw JSON both work). Alternatively, provide `GOOGLE_CLIENT_EMAIL` and `GOOGLE_PRIVATE_KEY`.
    - (Optional) override the frontend field mappings (`VITE_SHEETS_FIELD_*`) if the column names in the sheet differ from the default question names used in the analytics module.
 2. Share the sheet with the service account email so it can read values.
